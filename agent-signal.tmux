@@ -24,7 +24,7 @@ opt() { v=$(t show-option -gqv "$1"); [ -n "$v" ] && printf '%s' "$v" || printf 
 t set-option -g @agent_signal_command "$AS"
 
 # --- status bar badge -------------------------------------------------------
-BADGE='#{?#{@agent_icon}, #[fg=#{@agent_fg}#,bold]#{@agent_icon}#[default],}'
+BADGE=$("$AS" badge-format)   # one definition, in the script
 for o in window-status-format window-status-current-format; do
   cur=$(t show-option -gqv "$o")
   case $cur in *@agent_icon*) ;; *) t set-option -g "$o" "${cur}${BADGE}" ;; esac

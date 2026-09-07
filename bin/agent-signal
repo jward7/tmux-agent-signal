@@ -224,8 +224,21 @@ clear_done_panes() { # clear_done_panes <window>: acknowledge every done pane
   done
 }
 
+BADGE='#{?#{@agent_icon}, #[fg=#{@agent_fg}#,bold]#{@agent_icon}#[default],}'
+
+# A theme that sets window-status-format per window outranks the global one
+# and hides the badge on that window. Weave it into the window's own value.
+mend_window_format() { # mend_window_format <window>
+  for o in window-status-format window-status-current-format; do
+    cur=$(t show-option -wqv -t "$1" "$o")
+    [ -n "$cur" ] || continue
+    case $cur in *@agent_icon*) ;; *) t set-option -w -t "$1" "$o" "${cur}${BADGE}" ;; esac
+  done
+}
+
 refresh_window() { # refresh_window <window> [event]
   win=$1; ev=${2:-}
+  mend_window_format "$win"
   # One round trip for the window's previous state and hold.
   IFS='	' read -r prev hold <<EOF2
 $(t display -p -t "$win" '#{@agent_state}	#{@agent_hold}')
@@ -495,6 +508,7 @@ case ${1:-} in
   clear)  set_state clear "${2:-}" ;;
   seen)   seen "${2:-}" ;;
   summary) refresh_summary ;;
+  badge-format) printf '%s\n' "$BADGE" ;;
   lock-path) lock_path "${2:?window}" ;;
   next)   next ;;
   hold)   case ${2:-} in wait|park|clear) hold "$2" "${3:-}" ;; *) echo "agent-signal hold: wait, park or clear" >&2; exit 1 ;; esac ;;
