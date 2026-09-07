@@ -6,7 +6,6 @@ set -u
 CURRENT_DIR=$(cd "$(dirname "$0")" && pwd)
 AS="$CURRENT_DIR/bin/agent-signal"
 SW="$CURRENT_DIR/scripts/switcher.sh"
-chmod +x "$AS" "$SW" 2>/dev/null
 
 if command -v tmux >/dev/null 2>&1; then TMUX_BIN=tmux; else
   TMUX_BIN=""
