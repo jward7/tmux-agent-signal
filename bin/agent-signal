@@ -257,7 +257,7 @@ hook() {
         idle_prompt)
           # Fires ~60s after any finish. Only a pane still marked working needs
           # rescuing (turn ended without a Stop, e.g. Esc); otherwise leave it.
-          [ "$(pane_state "$(resolve_pane)")" = working ] && set_state "done" ;;
+          if [ "$(pane_state "$(resolve_pane)")" = working ]; then set_state "done"; fi ;;
       esac ;;
     Stop|StopFailure)
       n=$(json_get '(.background_tasks // []) | length' background_tasks)
