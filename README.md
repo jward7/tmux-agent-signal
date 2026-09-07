@@ -215,6 +215,13 @@ set -g @agent_signal_sound_ask Ping
 set -g @agent_signal_sound_done Glass
 
 set -g @agent_signal_notify off           # on = desktop banner too (terminal-notifier, osascript, notify-send)
+
+# Or run anything you like when a window changes state. Runs in the background,
+# only on a transition (blocked -> blocked stays quiet). tmux formats expand
+# against the window; the shell gets AGENT_SIGNAL_STATE, AGENT_SIGNAL_PREV,
+# AGENT_SIGNAL_WINDOW and AGENT_SIGNAL_PANE.
+set -g @agent_signal_alert_command 'terminal-notifier -title "#{session_name}:#{window_name}" -message "agent is $AGENT_SIGNAL_STATE" -execute "tmux switch-client -t $AGENT_SIGNAL_WINDOW"'
+set -g @agent_signal_alert_states 'blocked ask done
 set -g @agent_signal_bell off             # on = also ring tmux's bell in the pane (monitor-bell, works over SSH)
 
 # Keys ("" disables a binding)

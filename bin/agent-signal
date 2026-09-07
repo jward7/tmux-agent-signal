@@ -121,6 +121,19 @@ notify() { # notify <state> <window>
   fi
 }
 
+# Your own alert: @agent_signal_alert_command runs in the background on a state
+# transition (never on a repeat of the same state). tmux formats in it are
+# expanded against the window; the shell sees AGENT_SIGNAL_STATE,
+# AGENT_SIGNAL_PREV, AGENT_SIGNAL_WINDOW and AGENT_SIGNAL_PANE.
+alert_command() { # alert_command <state> <prev> <window> <pane>
+  cmd=$(opt @agent_signal_alert_command "")
+  [ -n "$cmd" ] || return 0
+  case " $(opt @agent_signal_alert_states "blocked ask done") " in *" $1 "*) ;; *) return 0 ;; esac
+  expanded=$(t display -p -t "$3" "$cmd")
+  (AGENT_SIGNAL_STATE=$1 AGENT_SIGNAL_PREV=$2 AGENT_SIGNAL_WINDOW=$3 AGENT_SIGNAL_PANE=$4 \
+     sh -c "$expanded" >/dev/null 2>&1 </dev/null &)
+}
+
 bell() { # bell <pane>: ring tmux's own bell in that pane (monitor-bell, SSH-safe)
   [ "$(opt @agent_signal_bell off)" = on ] || return 0
   tty=$(t display -p -t "$1" '#{pane_tty}')
@@ -244,7 +257,10 @@ EOF2
   if [ -n "$hold" ] && ! needs_you "$agg"; then paint_window "$win" "$hold"; else paint_window "$win" "$agg"; fi
 
   if [ -n "$ev" ] && [ "$agg" != "$prev" ] && [ -z "$hold" ]; then
-    case $agg in blocked|ask|done) visible "$win" || { play "$agg"; notify "$agg" "$win"; } ;; esac
+    case $agg in blocked|ask|done)
+      visible "$win" || { play "$agg"; notify "$agg" "$win"; }
+      alert_command "$agg" "$prev" "$win" "${EVENT_PANE:-}" ;;
+    esac
   fi
   refresh_summary
 }
@@ -286,7 +302,7 @@ bootstrap_if_needed() {
 
 set_state() { # set_state <state> [pane]
   bootstrap_if_needed
-  pane=$(resolve_pane "${2:-}")
+  pane=$(resolve_pane "${2:-}"); EVENT_PANE=$pane
   win=$(window_of "$pane") || exit 0
   lock_window "$win"
   case $1 in
