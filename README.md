@@ -108,8 +108,11 @@ start a new one, so Claude reloads its config.
 | `Stop` while a background task is still running | working, until a later `Stop` reports it finished |
 | `SessionEnd`                                  | cleared |
 
-Hooks are registered `async` so they never delay Claude. Each call is a few
-tmux commands and returns in milliseconds.
+Hooks are registered `async` so they never delay Claude. Each call is a
+handful of tmux commands: on an 18-pane server one event costs about a dozen
+tmux client calls, roughly half a second on a slow machine and much less on a
+fast one. Updates to the same window are serialised with a lock, since Claude
+runs hooks concurrently.
 
 ### Other agents
 
@@ -313,6 +316,11 @@ urgent pane. Pane state is stored under `@agent_pane_state`, a different name
 from the window's `@agent_state`, because pane options inherit from the window
 in tmux formats and would otherwise read back the aggregate.
 
+The plugin only ever touches a window's `window-status-style` when it set it,
+tracked with `@agent_tab_owned`, so a style you or a theme put on a window
+survives. Key bindings are skipped, with a message, when the key is already
+bound to something else.
+
 `agent-signal sync` reads Claude Code's own session registry
 (`~/.claude/sessions/*.json`, which records each session's tmux pane and
 display name) to label panes. It runs on `SessionStart`, when the plugin
@@ -321,7 +329,7 @@ loads, and when the switcher opens.
 ## Development
 
 ```sh
-sh test/run.sh        # end-to-end tests on an isolated tmux server (-L agent-signal-test)
+sh test/run.sh        # 80+ end-to-end checks on an isolated tmux server (-L agent-signal-test)
 shellcheck -s sh bin/agent-signal scripts/switcher.sh agent-signal.tmux test/run.sh
 sh docs/demo.sh       # throwaway server showing every state; tmux -L demo attach
 ```
