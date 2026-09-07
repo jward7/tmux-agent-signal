@@ -12,7 +12,7 @@ jobs:
       - uses: actions/checkout@v4
       - run: sudo apt-get update -q && sudo apt-get install -y -q shellcheck
       - run: shellcheck --version
-      - run: shellcheck -s sh bin/agent-signal scripts/switcher.sh agent-signal.tmux test/run.sh docs/demo.sh
+      - run: shellcheck -s sh bin/agent-signal scripts/switcher.sh agent-signal.tmux docs/demo.sh test/run.sh test/lib.sh test/t-*.sh
   test:
     strategy:
       matrix:

@@ -329,12 +329,17 @@ loads, and when the switcher opens.
 ## Development
 
 ```sh
-sh test/run.sh        # 80+ end-to-end checks on an isolated tmux server (-L agent-signal-test)
-shellcheck -s sh bin/agent-signal scripts/switcher.sh agent-signal.tmux test/run.sh
-sh docs/demo.sh       # throwaway server showing every state; tmux -L demo attach
+sh test/run.sh              # every test/t-*.sh, each on its own isolated tmux server, in parallel
+sh test/run.sh -j 1         # serial
+sh test/run.sh hooks next   # just those features
+sh test/t-hooks.sh          # one file on its own; KEEP=1 leaves its server up to poke at
+shellcheck -s sh bin/agent-signal scripts/switcher.sh agent-signal.tmux docs/demo.sh test/run.sh test/lib.sh test/t-*.sh
+sh docs/demo.sh             # throwaway server showing every state; tmux -L demo attach
 ```
 
-CI runs both on Ubuntu and macOS.
+Tests are real: each file starts a fresh server, loads the plugin, pipes hook
+JSON through the real script and asserts on tmux options. `test/lib.sh` holds
+the fixture and helpers. CI runs lint and the suite on Ubuntu and macOS.
 
 ## Troubleshooting
 
