@@ -1,6 +1,6 @@
 #!/bin/sh
 # shellcheck disable=SC1010,SC2209  # done, "wait", "park" are state words here, not keywords
-# agent-signal 0.2.0: per-window AI coding-agent state in the tmux status bar.
+# agent-signal 0.2.1: per-window AI coding-agent state in the tmux status bar.
 #
 # State lives in tmux user options, written by agent hooks and read natively
 # by the status line. No daemon, no polling, nothing runs on redraw.
@@ -27,6 +27,7 @@
 #   agent-signal summary                       recompute the status-right glyphs and needs-you count
 #   agent-signal install-claude-hooks          merge hooks into ~/.claude/settings.json (needs jq)
 #   agent-signal uninstall                     undo everything the entry file set on the server
+#   agent-signal lock-path <window>            print the lock directory used for that window (debugging)
 #   agent-signal help | version
 set -u
 
@@ -180,8 +181,13 @@ paint_window() { # paint_window <window> <state-or-hold>
 # Claude runs hooks concurrently, and refreshing a window is a read-modify-write
 # across many tmux calls. A per-window mkdir lock keeps two hooks for panes in
 # the same window from overwriting each other's result.
+# Window ids repeat across tmux servers, so the lock is keyed on the server's
+# socket path as well (a checksum keeps the name short and free of slashes).
+lock_path() { # lock_path <window>
+  printf '%s/agent-signal.%s.lock.%s.%s' "${TMPDIR:-/tmp}" "$(id -u)" "$(printf '%s' "${TMUX%%,*}" | cksum | cut -d' ' -f1)" "${1#@}"
+}
 lock_window() { # lock_window <window>
-  LOCK="${TMPDIR:-/tmp}/agent-signal.$(id -u).lock.${1#@}"
+  LOCK=$(lock_path "$1")
   i=0
   until mkdir "$LOCK" 2>/dev/null; do
     i=$((i + 1))
@@ -455,6 +461,7 @@ case ${1:-} in
   clear)  set_state clear "${2:-}" ;;
   seen)   seen "${2:-}" ;;
   summary) refresh_summary ;;
+  lock-path) lock_path "${2:?window}" ;;
   next)   next ;;
   hold)   case ${2:-} in wait|park|clear) hold "$2" "${3:-}" ;; *) echo "agent-signal hold: wait, park or clear" >&2; exit 1 ;; esac ;;
   list)   list ;;

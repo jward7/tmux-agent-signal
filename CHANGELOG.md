@@ -1,5 +1,14 @@
 # Changelog
 
+## 0.2.1 (2026-09-07)
+
+- The per-window lock is keyed on the tmux server socket as well as the
+  window id, so two servers on one machine cannot contend for each other's
+  locks or leave stale ones behind. `agent-signal lock-path <window>` prints
+  the path for debugging.
+- Tests: one file per feature, each on its own server, run in parallel by a
+  new runner (`sh test/run.sh`, `-j N`, feature names to filter).
+
 ## 0.2.0 (2026-09-07)
 
 Hardening from a full review; no new features.

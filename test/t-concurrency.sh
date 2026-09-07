@@ -16,4 +16,10 @@ is "10 racing PostToolUse/PermissionRequest rounds all ended blocked" "$i" 10
 hook "$P_R1" SessionEnd; hook "$P_R2" SessionEnd; T kill-window -t "$W_RACE"
 is "no lock directories left behind" "$(leftovers 'agent-signal.*.lock.*')" 0
 
+# Window ids repeat across servers: the lock must be keyed on the socket too.
+other=$(TMUX="${TMUX%%,*}-other,0,0" "$AS" lock-path "$W_RACE")
+mine=$("$AS" lock-path "$W_RACE")
+is "lock path differs for the same window id on another server" "$([ "$mine" != "$other" ] && echo differ)" differ
+is "lock path lives in the private TMPDIR" "${mine#"$TMPDIR"/}" "${mine##*/}"
+
 finish
