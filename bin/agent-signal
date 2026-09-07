@@ -25,6 +25,7 @@
 #   agent-signal sync                          pull names/presence from ~/.claude/sessions
 #   agent-signal summary                       recompute the status-right glyphs and needs-you count
 #   agent-signal install-claude-hooks          merge hooks into ~/.claude/settings.json (needs jq)
+#   agent-signal uninstall                     undo everything the entry file set on the server
 set -u
 
 PLUGIN_DIR=$(cd "$(dirname "$0")/.." && pwd)
@@ -415,6 +416,34 @@ install_claude_hooks() {
   ' "$settings" > "$tmp" && mv "$tmp" "$settings" && echo "hooks merged into $settings (backup: $settings.bak-agent-signal)"
 }
 
+# --- uninstall -------------------------------------------------------------
+# The inverse of agent-signal.tmux plus a sweep of live windows and panes.
+uninstall() {
+  for o in window-status-format window-status-current-format status-right; do
+    cur=$(t show-option -gqv "$o")
+    case $o in
+      status-right) new=${cur#"#{@agent_summary}"} ;;
+      *) new=${cur%"#{?#{@agent_icon}, #[fg=#{@agent_fg}#,bold]#{@agent_icon}#[default],}"} ;;
+    esac
+    [ "$new" != "$cur" ] && t set-option -g "$o" "$new"
+  done
+  for h in after-select-window client-session-changed client-attached pane-exited after-kill-pane window-unlinked; do
+    t set-hook -gu "${h}[91]" 2>/dev/null
+  done
+  for k in "$(opt @agent_signal_key_next N)" "$(opt @agent_signal_key_switcher A)" "$(opt @agent_signal_key_wait W)" "$(opt @agent_signal_key_park P)"; do
+    [ -n "$k" ] && t list-keys -T prefix | awk -v k="$k" '$4 == k' | grep -q agent-signal && t unbind-key -T prefix "$k"
+  done
+  for w in $(t list-windows -a -F '#{window_id}'); do
+    restore_tab "$w"
+    t set-option -uw -t "$w" @agent_state \; set-option -uw -t "$w" @agent_hold \; set-option -uw -t "$w" @agent_icon \; set-option -uw -t "$w" @agent_fg
+  done
+  for p in $(t list-panes -a -F '#{pane_id}'); do
+    t set-option -up -t "$p" @agent_pane_state \; set-option -up -t "$p" @agent_kind \; set-option -up -t "$p" @agent_name
+  done
+  t set-option -gu @agent_summary; t set-option -gu @agent_needs
+  echo "agent-signal: removed formats, hooks, key bindings and window/pane state. Claude hooks in ~/.claude/settings.json are left for you to delete."
+}
+
 # --- dispatch --------------------------------------------------------------
 case ${1:-} in
   hook)   hook "${2:?event}" ;;
@@ -427,5 +456,6 @@ case ${1:-} in
   list)   list ;;
   sync)   sync_registry ;;
   install-claude-hooks) install_claude_hooks ;;
+  uninstall) uninstall ;;
   *) sed -n '2,20p' "$0"; exit 1 ;;
 esac

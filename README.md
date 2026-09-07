@@ -130,6 +130,17 @@ the switcher labels it. Pointers:
   `ui_prompt_start`, calling `agent-signal set` via child_process.
 - **OpenCode**: a plugin on the equivalent events.
 
+### Uninstall
+
+```sh
+~/.tmux/plugins/tmux-agent-signal/bin/agent-signal uninstall
+```
+
+removes the status-bar fragments, hooks, key bindings and any per-window or
+per-pane state from the running server. Then drop the plugin line from your
+tmux config and delete the `agent-signal` entries from the hooks block in
+`~/.claude/settings.json`.
+
 ## Configuration
 
 Set any of these in `tmux.conf` before the plugin loads.
