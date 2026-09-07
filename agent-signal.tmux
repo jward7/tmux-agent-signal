@@ -36,7 +36,17 @@ if [ "$(opt @agent_signal_title off)" = on ]; then
 fi
 
 # --- key bindings (prefix + key; set an option to "" to skip a binding) ------
-bind() { k=$(opt "$1" "$2"); [ -n "$k" ] && t bind-key "$k" "$3"; }
+# Never clobber a binding the user already has: skip it and say so once.
+# (list-keys is filtered with awk: passing the key as an argument prints nothing on some versions.)
+bind() {
+  k=$(opt "$1" "$2"); [ -n "$k" ] || return 0
+  existing=$(t list-keys -T prefix | awk -v k="$k" '$4 == k')
+  case $existing in
+    "") t bind-key "$k" "$3" ;;
+    *agent-signal*|*switcher.sh*) t bind-key "$k" "$3" ;;   # ours from an earlier load
+    *) t display-message "agent-signal: prefix+$k already bound, set $1 to another key"; echo "agent-signal: prefix+$k already bound, set $1 to another key" >&2 ;;
+  esac
+}
 bind @agent_signal_key_next     N "run-shell -b '$AS next'"
 bind @agent_signal_key_switcher A "display-popup -E -w 70% -h 70% '$SW'"
 bind @agent_signal_key_wait     W "run-shell -b '$AS hold wait'"
