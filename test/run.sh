@@ -189,6 +189,17 @@ T set-option -g @agent_signal_ascii on; hook "$P_API" Stop
 is "ascii preset uses + for done"    "$(wicon "$W_API")" "+"
 T set-option -gu @agent_signal_ascii
 
+echo "without jq"
+NOJQ=$(mktemp -d); for b in sh cat tmux awk sed grep tr head cut sort ls mkdir rmdir sleep id dirname; do ln -s "$(command -v $b)" "$NOJQ/$b"; done
+nojq() { printf '%s' "$3" | PATH=$NOJQ TMUX_PANE=$1 "$AS" hook "$2"; }
+nojq "$P_API" PreToolUse '{ "tool_name" : "AskUserQuestion" }'
+is "sed fallback reads spaced JSON -> ask"        "$(wst "$W_API")" ask
+nojq "$P_API" Stop '{"background_tasks": [ {"id": "x"} ]}'
+is "sed fallback sees a non-empty task array"     "$(wst "$W_API")" working
+nojq "$P_API" Stop '{"background_tasks": []}'
+is "sed fallback sees an empty task array -> done" "$(wst "$W_API")" "done"
+hook "$P_API" SessionEnd; rm -rf "$NOJQ"
+
 echo "installer"
 FIX=$(mktemp -d); mkdir -p "$FIX/.claude"
 printf '{"hooks":{"Stop":[{"matcher":"","hooks":[{"type":"command","command":"echo mine"}]}]},"model":"x"}\n' > "$FIX/.claude/settings.json"

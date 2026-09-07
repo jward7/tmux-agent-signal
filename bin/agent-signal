@@ -53,11 +53,20 @@ opt() { # opt <name> <default>
 }
 
 # --- helpers ---------------------------------------------------------------
-json_get() { # json_get <jq-filter> <sed-key-fallback>
+json_get() { # json_get <jq-filter> <sed-key-fallback>: a string value by key
   if command -v jq >/dev/null 2>&1; then
     printf '%s' "$JSON" | jq -r "$1 // empty" 2>/dev/null
   else
-    printf '%s' "$JSON" | sed -n "s/.*\"$2\":\"\([^\"]*\)\".*/\1/p" | head -1
+    # First occurrence of "key": "value", tolerating whitespace around the colon.
+    printf '%s' "$JSON" | tr -d '\n' | sed -n "s/.*\"$2\"[[:space:]]*:[[:space:]]*\"\([^\"]*\)\".*/\1/p" | head -1
+  fi
+}
+
+json_array_nonempty() { # json_array_nonempty <jq-path> <key>: 0 if the array has elements
+  if command -v jq >/dev/null 2>&1; then
+    [ "$(printf '%s' "$JSON" | jq -r "($1 // []) | length" 2>/dev/null)" -gt 0 ] 2>/dev/null
+  else
+    printf '%s' "$JSON" | tr -d '\n' | grep -q "\"$2\"[[:space:]]*:[[:space:]]*\[[[:space:]]*[^]\t ]"
   fi
 }
 
@@ -290,8 +299,7 @@ hook() {
           if [ "$(pane_state "$(resolve_pane)")" = working ]; then set_state "done"; fi ;;
       esac ;;
     Stop|StopFailure)
-      n=$(json_get '(.background_tasks // []) | length' background_tasks)
-      case $n in ''|0) set_state "done" ;; *) set_state working ;; esac ;;
+      if json_array_nonempty '.background_tasks' background_tasks; then set_state working; else set_state "done"; fi ;;
     SessionEnd)        set_state clear ;;
   esac
 }
