@@ -146,19 +146,17 @@ restore_tab() { # restore_tab <window>
 paint_window() { # paint_window <window> <state-or-hold>
   set -- "$1" "$(style_for "$2")"
   if [ -z "$2" ]; then
-    t set-option -uw -t "$1" @agent_icon
-    t set-option -uw -t "$1" @agent_fg
+    t set-option -uw -t "$1" @agent_icon \; set-option -uw -t "$1" @agent_fg
     restore_tab "$1"
     return
   fi
   icon=${2%% *}; rest=${2#* }; fg=${rest%% *}; bg=${rest#* }
-  t set-option -w -t "$1" @agent_icon "$icon"
-  t set-option -w -t "$1" @agent_fg "$fg"
   if [ "$bg" = default ] || [ "$(opt @agent_signal_tab_colour on)" != on ]; then
+    t set-option -w -t "$1" @agent_icon "$icon" \; set-option -w -t "$1" @agent_fg "$fg"
     restore_tab "$1"
   else
-    t set-option -w -t "$1" window-status-style "fg=$fg,bg=$bg,bold"
-    t set-option -w -t "$1" @agent_tab_owned 1
+    t set-option -w -t "$1" @agent_icon "$icon" \; set-option -w -t "$1" @agent_fg "$fg" \
+      \; set-option -w -t "$1" window-status-style "fg=$fg,bg=$bg,bold" \; set-option -w -t "$1" @agent_tab_owned 1
   fi
 }
 
@@ -177,13 +175,22 @@ lock_window() { # lock_window <window>
 }
 unlock_window() { rmdir "${LOCK:-/nonexistent}" 2>/dev/null; trap - EXIT INT TERM; }
 
+clear_done_panes() { # clear_done_panes <window>: acknowledge every done pane
+  t list-panes -t "$1" -F '#{pane_id}	#{@agent_pane_state}' | while IFS='	' read -r p st; do
+    [ "$st" = "done" ] && t set-option -up -t "$p" @agent_pane_state
+  done
+}
+
 refresh_window() { # refresh_window <window> [event]
   win=$1; ev=${2:-}
-  prev=$(t show-option -wqv -t "$win" @agent_state)
-  hold=$(t show-option -wqv -t "$win" @agent_hold)
+  # One round trip for the window's previous state and hold.
+  IFS='	' read -r prev hold <<EOF2
+$(t display -p -t "$win" '#{@agent_state}	#{@agent_hold}')
+EOF2
   agg=""
-  for p in $(t list-panes -t "$win" -F '#{pane_id}'); do
-    case $(pane_state "$p") in
+  # One round trip for every pane's state.
+  for st in $(t list-panes -t "$win" -F '#{?@agent_pane_state,#{@agent_pane_state},-}'); do
+    case $st in
       blocked) agg=blocked ;;
       ask)     [ "$agg" != blocked ] && agg=ask ;;
       done)    needs_you "$agg" || agg="done" ;;
@@ -198,9 +205,7 @@ refresh_window() { # refresh_window <window> [event]
 
   # Finished while you were already looking at it -> nothing to flag.
   if [ "$agg" = "done" ] && [ -n "$ev" ] && visible "$win"; then
-    for p in $(t list-panes -t "$win" -F '#{pane_id}'); do
-      [ "$(pane_state "$p")" = "done" ] && t set-option -up -t "$p" @agent_pane_state
-    done
+    clear_done_panes "$win"
     agg=""
   fi
 
@@ -320,9 +325,7 @@ seen() {
   win=$(current_window)
   [ "$(t show-option -wqv -t "$win" @agent_state)" = "done" ] || return 0
   lock_window "$win"
-  for p in $(t list-panes -t "$win" -F '#{pane_id}'); do
-    [ "$(pane_state "$p")" = "done" ] && t set-option -up -t "$p" @agent_pane_state
-  done
+  clear_done_panes "$win"
   refresh_window "$win"
   unlock_window
 }
