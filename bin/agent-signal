@@ -154,7 +154,11 @@ restore_tab() { # restore_tab <window>
 }
 
 paint_window() { # paint_window <window> <state-or-hold>
-  set -- "$1" "$(style_for "$2")"
+  set -- "$1" "$(style_for "$2")" "$2"
+  case $2 in
+    ""|*' '*' '*) ;;   # empty, or the three fields we need
+    *) echo "agent-signal: option for '$3' must be '<icon> <fg> <bg>', got '$2'" >&2; return 0 ;;
+  esac
   if [ -z "$2" ]; then
     t set-option -uw -t "$1" @agent_icon \; set-option -uw -t "$1" @agent_fg
     restore_tab "$1"

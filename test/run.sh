@@ -188,6 +188,9 @@ is "list has session, window and pane rows" "$("$AS" list | cut -f1 | sort -u | 
 T set-option -g @agent_signal_ascii on; hook "$P_API" Stop
 is "ascii preset uses + for done"    "$(wicon "$W_API")" "+"
 T set-option -gu @agent_signal_ascii
+T set-option -g @agent_signal_working BROKEN
+is "a malformed style option is reported, not passed to tmux" "$(hook "$P_API" UserPromptSubmit 2>&1 | grep -c 'must be')" 1
+T set-option -gu @agent_signal_working
 
 echo "without jq"
 NOJQ=$(mktemp -d); for b in sh cat tmux awk sed grep tr head cut sort ls mkdir rmdir sleep id dirname; do ln -s "$(command -v $b)" "$NOJQ/$b"; done
