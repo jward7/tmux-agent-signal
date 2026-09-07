@@ -26,6 +26,7 @@ is "all state cleared"               "$(T list-panes -a -F '#{@agent_pane_state}
 is "summary cleared"                 "$(gsum)" ""
 
 LOG="$TMPDIR/alerts.log"
+# shellcheck disable=SC2016  # the $vars are meant for the helper script, not this shell
 printf '%s\n' '#!/bin/sh' 'printf "%s<%s %s\\n" "$AGENT_SIGNAL_STATE" "$AGENT_SIGNAL_PREV" "$1" >> "$2"' > "$TMPDIR/alert.sh"
 T set-option -g @agent_signal_alert_command "sh '$TMPDIR/alert.sh' '#{window_name}' '$LOG'"
 hook "$P_API" UserPromptSubmit; hook "$P_API" PermissionRequest; hook "$P_API" PermissionRequest; hook "$P_API" Stop

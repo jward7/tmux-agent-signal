@@ -481,21 +481,22 @@ check() {
   bad=0
   say() { printf '  %-4s %s\n' "$1" "$2"; [ "$1" = fail ] && bad=1; return 0; }
   echo "agent-signal $(sed -n 's/^# agent-signal \([0-9.]*\):.*/\1/p' "$0") on tmux $(t display -p '#{version}')"
-  [ -n "${TMUX:-}" ] && say ok "inside tmux ($TMUX_BIN)" || say fail "TMUX is not set: run this from a pane"
-  [ "$(t show-option -gqv @agent_signal_command)" = "$SELF" ] && say ok "command path published" || say fail "@agent_signal_command not published: source agent-signal.tmux"
+  if [ -n "${TMUX:-}" ]; then say ok "inside tmux ($TMUX_BIN)"; else say fail "TMUX is not set: run this from a pane"; fi
+  if [ "$(t show-option -gqv @agent_signal_command)" = "$SELF" ]; then say ok "command path published"; else say fail "@agent_signal_command not published: source agent-signal.tmux"; fi
   case $(t show-option -gv window-status-format) in *@agent_icon*) say ok "badge in window-status-format" ;; *) say fail "badge missing from window-status-format" ;; esac
   case $(t show-option -gv status-right) in *@agent_summary*) say ok "summary in status-right" ;; *) say warn "summary not in status-right" ;; esac
-  n=$(t show-hooks -g | grep -c "agent-signal"); [ "$n" -ge 5 ] && say ok "$n hooks installed" || say fail "only $n of 5 hooks installed"
+  n=$(t show-hooks -g | grep -c "agent-signal"); if [ "$n" -ge 5 ]; then say ok "$n hooks installed"; else say fail "only $n of 5 hooks installed"; fi
   for k in next switcher wait park; do
     key=$(opt "@agent_signal_key_$k" "")
     [ -z "$key" ] && { case $k in next) key=N ;; switcher) key=A ;; wait) key=W ;; park) key=P ;; esac; }
     if t list-keys -T prefix | awk -v k="$key" '$4 == k' | grep -qE 'agent-signal|switcher'; then say ok "prefix+$key -> $k"; else say warn "prefix+$key is not ours ($k unbound)"; fi
   done
   themed=$(t list-windows -a -F '#{window_id}	#{?window-status-format,#{window-status-format},-}' | awk -F'	' '$2 != "-" && $2 !~ /@agent_icon/ {print $1}' | tr '\n' ' ')
-  [ -z "$themed" ] && say ok "no window overrides its format without the badge" || say warn "windows with an unmended format override: $themed (fixed on their next event)"
+  if [ -z "$themed" ]; then say ok "no window overrides its format without the badge"; else say warn "windows with an unmended format override: $themed (fixed on their next event)"; fi
   agents=$(t list-panes -a -F '#{?@agent_kind,1,}' | grep -c 1); say ok "$agents pane(s) report an agent"
-  for tool in jq fzf; do command -v $tool >/dev/null 2>&1 && say ok "$tool found" || say warn "$tool not found ($( [ $tool = jq ] && echo 'sed fallback for hooks; installer unavailable' || echo 'switcher unavailable'))"; done
-  [ -x /usr/bin/afplay ] || command -v paplay >/dev/null 2>&1 && say ok "sound player found" || say warn "no sound player (afplay/paplay)"
+  if command -v jq >/dev/null 2>&1; then say ok "jq found"; else say warn "jq not found (sed fallback for hooks; installer unavailable)"; fi
+  if command -v fzf >/dev/null 2>&1; then say ok "fzf found"; else say warn "fzf not found (switcher unavailable)"; fi
+  if [ -x /usr/bin/afplay ] || command -v paplay >/dev/null 2>&1; then say ok "sound player found"; else say warn "no sound player (afplay/paplay)"; fi
   return $bad
 }
 
