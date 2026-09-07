@@ -452,7 +452,7 @@ uninstall() {
   for p in $(t list-panes -a -F '#{pane_id}'); do
     t set-option -up -t "$p" @agent_pane_state \; set-option -up -t "$p" @agent_kind \; set-option -up -t "$p" @agent_name
   done
-  t set-option -gu @agent_summary; t set-option -gu @agent_needs
+  t set-option -gu @agent_summary; t set-option -gu @agent_needs; t set-option -gu @agent_signal_command
   echo "agent-signal: removed formats, hooks, key bindings and window/pane state. Claude hooks in ~/.claude/settings.json are left for you to delete."
 }
 

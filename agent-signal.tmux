@@ -17,6 +17,12 @@ fi
 t() { "$TMUX_BIN" "$@"; }
 opt() { v=$(t show-option -gqv "$1"); [ -n "$v" ] && printf '%s' "$v" || printf '%s' "$2"; }
 
+# --- publish where we live ----------------------------------------------------
+# Anything that wants to report a state (another agent's hook file, a shell
+# alias) can ask the server instead of hard-coding a plugin directory:
+#   "$(tmux show -gv @agent_signal_command)" set blocked
+t set-option -g @agent_signal_command "$AS"
+
 # --- status bar badge -------------------------------------------------------
 BADGE='#{?#{@agent_icon}, #[fg=#{@agent_fg}#,bold]#{@agent_icon}#[default],}'
 for o in window-status-format window-status-current-format; do

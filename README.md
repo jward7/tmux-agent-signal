@@ -126,7 +126,15 @@ agent-signal clear [pane-id]
 
 The pane defaults to `$TMUX_PANE`, which tmux exports to every process in the
 pane. Set `AGENT_KIND=codex` (or `pi`, `opencode`, ...) in the environment so
-the switcher labels it. Pointers:
+the switcher labels it. Nothing needs to know where the plugin is installed:
+the entry file publishes the script's path as a server option, so a hook can
+always call
+
+```sh
+"$(tmux show -gv @agent_signal_command)" set blocked
+```
+
+Pointers:
 
 - **Codex CLI**: `hooks` in `~/.codex/config.toml`, map turn start/end to
   working/done, approval prompts to blocked, and questions to ask.

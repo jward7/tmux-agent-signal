@@ -21,4 +21,6 @@ sh "$ROOT/agent-signal.tmux"
 is "sourcing the entry file twice appends the badge once (2 mentions per badge)" "$(T show-option -gv window-status-format | grep -o agent_icon | wc -l | tr -d ' ')" 2
 is "sourcing twice prepends the summary once"                                    "$(T show-option -gv status-right | grep -o agent_summary | wc -l | tr -d ' ')" 1
 
+is "the command path is published for other agents to find" "$(T show-option -gv @agent_signal_command)" "$AS"
+
 finish
