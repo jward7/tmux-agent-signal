@@ -46,7 +46,7 @@ else
 fi
 t() { "$TMUX_BIN" "$@"; }
 
-[ -n "${TMUX:-}" ] || [ "${1:-}" = install-claude-hooks ] || exit 0
+case ${1:-} in install-claude-hooks|help|-h|--help) ;; *) [ -n "${TMUX:-}" ] || exit 0 ;; esac
 
 # --- options ---------------------------------------------------------------
 opt() { # opt <name> <default>
@@ -447,17 +447,20 @@ uninstall() {
 }
 
 # --- dispatch --------------------------------------------------------------
+usage() { sed -n '/^# Usage:/,/^set -u/p' "$0" | sed '$d' | sed 's/^# \{0,1\}//'; }
 case ${1:-} in
-  hook)   hook "${2:?event}" ;;
-  set)    set_state "${2:?state}" "${3:-}" ;;
+  hook)   [ -n "${2:-}" ] || { echo "agent-signal hook: which event? e.g. Stop" >&2; exit 1; }; hook "$2" ;;
+  set)    [ -n "${2:-}" ] || { echo "agent-signal set: which state? working|blocked|ask|done|idle" >&2; exit 1; }; set_state "$2" "${3:-}" ;;
   clear)  set_state clear "${2:-}" ;;
   seen)   seen "${2:-}" ;;
   summary) refresh_summary ;;
   next)   next ;;
-  hold)   hold "${2:?wait|park|clear}" "${3:-}" ;;
+  hold)   case ${2:-} in wait|park|clear) hold "$2" "${3:-}" ;; *) echo "agent-signal hold: wait, park or clear" >&2; exit 1 ;; esac ;;
   list)   list ;;
   sync)   sync_registry ;;
   install-claude-hooks) install_claude_hooks ;;
   uninstall) uninstall ;;
-  *) sed -n '2,20p' "$0"; exit 1 ;;
+  help|-h|--help) usage ;;
+  "") usage >&2; exit 1 ;;
+  *) echo "agent-signal: unknown command '$1'" >&2; usage >&2; exit 1 ;;
 esac

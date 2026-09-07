@@ -242,6 +242,13 @@ is "the other three keys are still bound"        "$(T list-keys -T prefix | grep
 T unbind-key N; sh "$ROOT/agent-signal.tmux"
 is "reloading rebinds our own key without complaint" "$(T list-keys -T prefix | awk '$4 == "N"' | grep -c 'agent-signal next')" 1
 
+echo "usage"
+is "help exits 0 and prints the usage block"  "$("$AS" help | grep -c 'agent-signal hook'; echo "rc=$?")" "1
+rc=0"
+is "help works outside tmux"                  "$(TMUX= "$AS" --help | grep -c Usage)" 1
+is "unknown command exits 1 with a message"   "$("$AS" bogus 2>&1 >/dev/null | head -1)" "agent-signal: unknown command 'bogus'"
+is "hold without a mode explains itself"      "$("$AS" hold 2>&1 | head -1)" "agent-signal hold: wait, park or clear"
+
 echo "uninstall"
 hook "$P_API" PermissionRequest
 "$AS" uninstall >/dev/null
