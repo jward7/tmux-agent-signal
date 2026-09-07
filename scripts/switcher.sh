@@ -9,9 +9,11 @@ command -v fzf >/dev/null 2>&1 || { echo "agent-signal switcher needs fzf (brew 
 
 # Same resolution as bin/agent-signal (Homebrew unlinks tmux mid-upgrade).
 if command -v tmux >/dev/null 2>&1; then TMUX_BIN=tmux; else
+  TMUX_BIN=""
   for c in /opt/homebrew/bin/tmux /usr/local/bin/tmux /usr/bin/tmux /opt/homebrew/Cellar/tmux/*/bin/tmux /usr/local/Cellar/tmux/*/bin/tmux; do
     [ -x "$c" ] && TMUX_BIN=$c && break
   done
+  [ -n "$TMUX_BIN" ] || { echo "agent-signal: tmux not found" >&2; exit 0; }
 fi
 
 while :; do

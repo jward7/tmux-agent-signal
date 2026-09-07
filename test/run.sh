@@ -83,6 +83,13 @@ hook "$P_API" PreToolUse '{"tool_name":"Bash"}'
 hook "$P_API" Notification '{"notification_type":"idle_prompt"}'
 is "idle_prompt rescues an interrupted turn -> done" "$(wst "$W_API")" "done"
 
+echo "no tmux on PATH"
+# With PATH empty the scripts must fall back to a known install path or exit 0,
+# never die on an unbound variable.
+is "entry file survives an empty PATH"  "$(PATH=/nonexistent /bin/sh "$ROOT/agent-signal.tmux" 2>&1 | grep -c unbound; echo "rc=$?")" "0
+rc=1"
+is "switcher survives an empty PATH"    "$(PATH=/nonexistent /bin/sh "$ROOT/scripts/switcher.sh" </dev/null 2>&1 | grep -c unbound)" 0
+
 echo "hook exit codes"
 printf '{"notification_type":"idle_prompt"}' | TMUX_PANE=$P_API "$AS" hook Notification; rc=$?
 is "idle_prompt on a pane with nothing to rescue exits 0" "$rc" 0
