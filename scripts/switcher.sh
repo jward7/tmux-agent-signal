@@ -32,7 +32,10 @@ while :; do
 
   case $key in
     ctrl-x)
-      printf 'Close %s? [y/N] ' "$label"; read -r yn < /dev/tty
+      yn=y
+      if [ "$("$TMUX_BIN" show-option -gqv @agent_signal_confirm_close)" != off ]; then
+        printf 'Close %s? [y/N] ' "$label"; read -r yn < /dev/tty
+      fi
       case $yn in y|Y)
         case $kind in
           S) "$TMUX_BIN" kill-session -t "$sess" ;;

@@ -4,10 +4,12 @@
 # State lives in tmux user options, written by agent hooks and read natively
 # by the status line. No daemon, no polling, nothing runs on redraw.
 #
-#   pane   @agent_state   working | blocked | done   (unset = idle / no agent)
+#   pane   @agent_pane_state  working | blocked | ask | done   (unset = idle / no agent)
 #   pane   @agent_kind    claude | codex | pi | ...   (who reported)
 #   pane   @agent_name    display name (from Claude's session registry)
-#   window @agent_state   aggregate of its panes: blocked > done > working
+#   window @agent_state   aggregate of its panes: blocked > ask > done > working
+#   global @agent_summary  one coloured glyph per agent pane, for status-right
+#   global @agent_needs    count of windows needing you (blocked or ask), for titles
 #   window @agent_hold    wait | park                (user triage override)
 #   window @agent_icon / @agent_fg / @agent_bg       what the status bar draws
 #
@@ -20,6 +22,7 @@
 #   agent-signal hold wait|park|clear          triage the current window
 #   agent-signal list                          tree of sessions/windows/panes (for the switcher)
 #   agent-signal sync                          pull names/presence from ~/.claude/sessions
+#   agent-signal summary                       recompute the status-right glyphs and needs-you count
 #   agent-signal install-claude-hooks          merge hooks into ~/.claude/settings.json (needs jq)
 set -u
 
@@ -65,9 +68,10 @@ resolve_pane() { # resolve_pane [pane] -> echoes pane id
 
 window_of() { t display -p -t "$1" '#{window_id}'; }
 
-# Pane options inherit from the window in formats, so read them directly.
-pane_state() { t show-option -pqv -t "$1" @agent_state 2>/dev/null; }
-pane_opt()   { t show-option -pqv -t "$1" "$2" 2>/dev/null; }
+# Pane state is kept under its own option name (@agent_pane_state) so that
+# formats never fall through to the window's @agent_state via inheritance.
+pane_state() { t display -p -t "$1" '#{@agent_pane_state}' 2>/dev/null; }
+pane_opt()   { t display -p -t "$1" "#{$2}" 2>/dev/null; }
 
 visible() { # visible <window> -> 0 if that window is on screen in an attached client
   [ "$(t display -p -t "$1" '#{window_active}#{?session_attached,1,0}')" = "11" ]
@@ -77,6 +81,7 @@ play() { # play <state>
   [ "$(opt @agent_signal_sound on)" = on ] || return 0
   case $1 in
     blocked) s=$(opt @agent_signal_sound_blocked Ping) ;;
+    ask)     s=$(opt @agent_signal_sound_ask "$(opt @agent_signal_sound_blocked Ping)") ;;
     done)    s=$(opt @agent_signal_sound_done Glass) ;;
     *) return 0 ;;
   esac
@@ -110,15 +115,23 @@ bell() { # bell <pane>: ring tmux's own bell in that pane (monitor-bell, SSH-saf
 
 # --- state -----------------------------------------------------------------
 style_for() { # style_for <state|hold> -> "icon fg bg"
+  if [ "$(opt @agent_signal_ascii off)" = on ]; then
+    d_done="+ black green"; d_wait=". colour245 default"; d_ask="? black colour213"
+  else
+    d_done="✓ black green"; d_wait="… colour245 default"; d_ask="? black colour213"
+  fi
   case $1 in
     working) printf '%s' "$(opt @agent_signal_working "~ yellow default")" ;;
     blocked) printf '%s' "$(opt @agent_signal_blocked "! black colour208")" ;;
-    done)    printf '%s' "$(opt @agent_signal_done "✓ black green")" ;;
-    wait)    printf '%s' "$(opt @agent_signal_wait "… colour245 default")" ;;
+    ask)     printf '%s' "$(opt @agent_signal_ask "$d_ask")" ;;
+    done)    printf '%s' "$(opt @agent_signal_done "$d_done")" ;;
+    wait)    printf '%s' "$(opt @agent_signal_wait "$d_wait")" ;;
     park)    printf '%s' "$(opt @agent_signal_park "p colour240 default")" ;;
     *)       printf '' ;;
   esac
 }
+
+needs_you() { case $1 in blocked|ask) return 0 ;; *) return 1 ;; esac; }
 
 paint_window() { # paint_window <window> <state-or-hold>
   set -- "$1" "$(style_for "$2")"
@@ -146,7 +159,8 @@ refresh_window() { # refresh_window <window> [event]
   for p in $(t list-panes -t "$win" -F '#{pane_id}'); do
     case $(pane_state "$p") in
       blocked) agg=blocked ;;
-      done)    [ "$agg" != blocked ] && agg=done ;;
+      ask)     [ "$agg" != blocked ] && agg=ask ;;
+      done)    needs_you "$agg" || agg=done ;;
       working) [ -z "$agg" ] && agg=working ;;
     esac
   done
@@ -159,31 +173,63 @@ refresh_window() { # refresh_window <window> [event]
   # Finished while you were already looking at it -> nothing to flag.
   if [ "$agg" = done ] && [ -n "$ev" ] && visible "$win"; then
     for p in $(t list-panes -t "$win" -F '#{pane_id}'); do
-      [ "$(pane_state "$p")" = done ] && t set-option -up -t "$p" @agent_state
+      [ "$(pane_state "$p")" = done ] && t set-option -up -t "$p" @agent_pane_state
     done
     agg=""
   fi
 
   if [ -n "$agg" ]; then t set-option -w -t "$win" @agent_state "$agg"; else t set-option -uw -t "$win" @agent_state; fi
 
-  if [ -n "$hold" ] && [ "$agg" != blocked ]; then paint_window "$win" "$hold"; else paint_window "$win" "$agg"; fi
+  if [ -n "$hold" ] && ! needs_you "$agg"; then paint_window "$win" "$hold"; else paint_window "$win" "$agg"; fi
 
   if [ -n "$ev" ] && [ "$agg" != "$prev" ] && [ -z "$hold" ]; then
-    case $agg in blocked|done) visible "$win" || { play "$agg"; notify "$agg" "$win"; } ;; esac
+    case $agg in blocked|ask|done) visible "$win" || { play "$agg"; notify "$agg" "$win"; } ;; esac
   fi
+  refresh_summary
+}
+
+glyph_for() { # glyph_for <kind>
+  case $1 in
+    claude) opt @agent_signal_glyph_claude '✳' ;;
+    codex)  opt @agent_signal_glyph_codex '⬢' ;;
+    pi)     opt @agent_signal_glyph_pi 'π' ;;
+    *)      opt @agent_signal_glyph_other '●' ;;
+  esac
+}
+
+refresh_summary() { # one glyph per agent pane, coloured by state; count of windows needing you
+  glyphs=""; needs=0
+  # window_id first: `read` strips leading IFS whitespace, so an empty first field would shift the rest
+  t list-panes -a -F '#{window_id}	#{?@agent_kind,#{@agent_kind},-}	#{?@agent_pane_state,#{@agent_pane_state},-}' | while IFS='	' read -r wid kind st; do
+    [ "$kind" != - ] || continue
+    [ "$st" = - ] && st=""
+    case $st in
+      working) c=$(opt @agent_signal_colour_working yellow) ;;
+      blocked) c=$(opt @agent_signal_colour_blocked colour208) ;;
+      ask)     c=$(opt @agent_signal_colour_ask colour213) ;;
+      done)    c=$(opt @agent_signal_colour_done green) ;;
+      *)       c=$(opt @agent_signal_colour_idle colour245) ;;
+    esac
+    printf '%s\t%s\n' "#[fg=$c]$(glyph_for "$kind")" "$( needs_you "$st" && printf '%s' "$wid" )"
+  done > "${TMPDIR:-/tmp}/agent-signal.$$"
+  glyphs=$(cut -f1 "${TMPDIR:-/tmp}/agent-signal.$$" | tr -d '\n')
+  needs=$(cut -f2 "${TMPDIR:-/tmp}/agent-signal.$$" | grep -c .)
+  rm -f "${TMPDIR:-/tmp}/agent-signal.$$"
+  if [ -n "$glyphs" ]; then t set-option -g @agent_summary "${glyphs}#[default] "; else t set-option -gu @agent_summary; fi
+  if [ "$needs" -gt 0 ]; then t set-option -g @agent_needs "$needs"; else t set-option -gu @agent_needs; fi
 }
 
 set_state() { # set_state <state> [pane]
   pane=$(resolve_pane "${2:-}")
   win=$(window_of "$pane") || exit 0
   case $1 in
-    working|blocked|done) t set-option -p -t "$pane" @agent_state "$1" ;;
-    idle|clear|"")        t set-option -up -t "$pane" @agent_state ;;
+    working|blocked|ask|done) t set-option -p -t "$pane" @agent_pane_state "$1" ;;
+    idle|clear|"")        t set-option -up -t "$pane" @agent_pane_state ;;
     *) echo "agent-signal: unknown state '$1'" >&2; exit 1 ;;
   esac
   [ "$1" = clear ] && { t set-option -up -t "$pane" @agent_kind; t set-option -up -t "$pane" @agent_name; } \
                    || t set-option -p -t "$pane" @agent_kind "${AGENT_KIND:-agent}"
-  [ "$1" = blocked ] && bell "$pane"
+  needs_you "$1" && bell "$pane"
   refresh_window "$win" event
 }
 
@@ -193,12 +239,21 @@ hook() {
   AGENT_KIND=claude
   case $1 in
     SessionStart)      set_state idle; sync_registry ;;
-    UserPromptSubmit|PreToolUse|PostToolUse) set_state working ;;
+    UserPromptSubmit|PostToolUse) set_state working ;;
+    PreToolUse)
+      case $(json_get '.tool_name' tool_name) in
+        AskUserQuestion|ExitPlanMode) set_state ask ;;   # waiting on your answer, not busy
+        *) set_state working ;;
+      esac ;;
     PermissionRequest) set_state blocked ;;
     Notification)
       case $(json_get '.notification_type' notification_type) in
-        permission_prompt|elicitation*|agent_needs_input) set_state blocked ;;
-        idle_prompt) set_state done ;;   # turn ended without a Stop (e.g. Esc)
+        permission_prompt) set_state blocked ;;
+        elicitation*|agent_needs_input) set_state ask ;;
+        idle_prompt)
+          # Fires ~60s after any finish. Only a pane still marked working needs
+          # rescuing (turn ended without a Stop, e.g. Esc); otherwise leave it.
+          [ "$(pane_state "$(resolve_pane)")" = working ] && set_state done ;;
       esac ;;
     Stop|StopFailure)
       n=$(json_get '(.background_tasks // []) | length' background_tasks)
@@ -220,6 +275,7 @@ sync_registry() {
         [ -n "$name" ] && [ "$name" != - ] && t set-option -p -t "$pane" @agent_name "$name"
         t set-option -p -t "$pane" @agent_kind claude; }
   done
+  refresh_summary
 }
 
 # --- navigation & triage ---------------------------------------------------
@@ -229,7 +285,7 @@ seen() {
   win=$(current_window)
   [ "$(t show-option -wqv -t "$win" @agent_state)" = done ] || return 0
   for p in $(t list-panes -t "$win" -F '#{pane_id}'); do
-    [ "$(pane_state "$p")" = done ] && t set-option -up -t "$p" @agent_state
+    [ "$(pane_state "$p")" = done ] && t set-option -up -t "$p" @agent_pane_state
   done
   refresh_window "$win"
 }
@@ -241,7 +297,7 @@ next() {
   after=$(printf '%s\n' "$list" | sed -n "/^$cur /,\$p" | sed '1d')
   before=$(printf '%s\n' "$list" | sed "/^$cur /,\$d")
   ordered=$(printf '%s\n%s\n' "$after" "$before")
-  for want in blocked done; do
+  for want in blocked ask done; do
     target=$(printf '%s\n' "$ordered" | awk -v w="$want" '$3==w && $4=="" {print $1" "$2; exit}')
     if [ -n "$target" ]; then
       t switch-client -t "${target#* }" 2>/dev/null
@@ -269,7 +325,7 @@ hold() { # hold wait|park|clear [window]
 list() {
   sync_registry
   t list-sessions -F '#{session_name}' | while read -r s; do
-    sstate=$(t list-windows -t "$s" -F '#{@agent_state}' | awk '/blocked/{b=1} /done/{d=1} /working/{w=1} END{if(b)print "!";else if(d)print "✓";else if(w)print "~"}')
+    sstate=$(t list-windows -t "$s" -F '#{@agent_state}' | awk '/blocked/{b=1} /ask/{a=1} /done/{d=1} /working/{w=1} END{if(b)print "!";else if(a)print "?";else if(d)print "+";else if(w)print "~"}')
     printf 'S\t%s\t%-2s %s\n' "$s" "$sstate" "$s"
     # tab-separated; empty fields are sent as "-" because `read` collapses runs of tabs
     t list-windows -t "$s" -F '#{window_id}	#{window_index}	#{window_name}	#{?@agent_state,#{@agent_state},-}	#{?@agent_hold,#{@agent_hold},-}	#{window_panes}' \
@@ -309,6 +365,7 @@ case ${1:-} in
   set)    set_state "${2:?state}" "${3:-}" ;;
   clear)  set_state clear "${2:-}" ;;
   seen)   seen ;;
+  summary) refresh_summary ;;
   next)   next ;;
   hold)   hold "${2:?wait|park|clear}" "${3:-}" ;;
   list)   list ;;
