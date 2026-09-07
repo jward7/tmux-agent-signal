@@ -26,6 +26,7 @@
 #   agent-signal sync                          pull names/presence from ~/.claude/sessions
 #   agent-signal summary                       recompute the status-right glyphs and needs-you count
 #   agent-signal install-claude-hooks          merge hooks into ~/.claude/settings.json (needs jq)
+#   agent-signal check                         report what is wired and what is missing (exit 1 if broken)
 #   agent-signal uninstall                     undo everything the entry file set on the server
 #   agent-signal lock-path <window>            print the lock directory used for that window (debugging)
 #   agent-signal help | version
@@ -472,6 +473,31 @@ install_claude_hooks() {
   ' "$settings" > "$tmp" && mv "$tmp" "$settings" && echo "hooks merged into $settings (backup: $settings.bak-agent-signal)"
 }
 
+# --- check -----------------------------------------------------------------
+# What is wired, what is missing, and whether anything reports. Exits 1 if
+# something the plugin relies on is not in place.
+check() {
+  bad=0
+  say() { printf '  %-4s %s\n' "$1" "$2"; [ "$1" = fail ] && bad=1; }
+  echo "agent-signal $(sed -n 's/^# agent-signal \([0-9.]*\):.*/\1/p' "$0") on tmux $(t display -p '#{version}')"
+  [ -n "${TMUX:-}" ] && say ok "inside tmux ($TMUX_BIN)" || say fail "TMUX is not set: run this from a pane"
+  [ "$(t show-option -gqv @agent_signal_command)" = "$SELF" ] && say ok "command path published" || say fail "@agent_signal_command not published: source agent-signal.tmux"
+  case $(t show-option -gv window-status-format) in *@agent_icon*) say ok "badge in window-status-format" ;; *) say fail "badge missing from window-status-format" ;; esac
+  case $(t show-option -gv status-right) in *@agent_summary*) say ok "summary in status-right" ;; *) say warn "summary not in status-right" ;; esac
+  n=$(t show-hooks -g | grep -c "agent-signal"); [ "$n" -ge 6 ] && say ok "$n hooks installed" || say fail "only $n of 6 hooks installed"
+  for k in next switcher wait park; do
+    key=$(opt "@agent_signal_key_$k" "")
+    [ -z "$key" ] && { case $k in next) key=N ;; switcher) key=A ;; wait) key=W ;; park) key=P ;; esac; }
+    if t list-keys -T prefix | awk -v k="$key" '$4 == k' | grep -qE 'agent-signal|switcher'; then say ok "prefix+$key -> $k"; else say warn "prefix+$key is not ours ($k unbound)"; fi
+  done
+  themed=$(t list-windows -a -F '#{window_id}	#{?window-status-format,#{window-status-format},-}' | awk -F'	' '$2 != "-" && $2 !~ /@agent_icon/ {print $1}' | tr '\n' ' ')
+  [ -z "$themed" ] && say ok "no window overrides its format without the badge" || say warn "windows with an unmended format override: $themed (fixed on their next event)"
+  agents=$(t list-panes -a -F '#{?@agent_kind,1,}' | grep -c 1); say ok "$agents pane(s) report an agent"
+  for tool in jq fzf; do command -v $tool >/dev/null 2>&1 && say ok "$tool found" || say warn "$tool not found ($( [ $tool = jq ] && echo 'sed fallback for hooks; installer unavailable' || echo 'switcher unavailable'))"; done
+  [ -x /usr/bin/afplay ] || command -v paplay >/dev/null 2>&1 && say ok "sound player found" || say warn "no sound player (afplay/paplay)"
+  return $bad
+}
+
 # --- uninstall -------------------------------------------------------------
 # The inverse of agent-signal.tmux plus a sweep of live windows and panes.
 uninstall() {
@@ -516,6 +542,7 @@ case ${1:-} in
   sync)   sync_registry ;;
   install-claude-hooks) install_claude_hooks ;;
   uninstall) uninstall ;;
+  check)  check ;;
   help|-h|--help) usage ;;
   version|--version) sed -n 's/^# agent-signal \([0-9.]*\):.*/\1/p' "$0" ;;
   "") usage >&2; exit 1 ;;

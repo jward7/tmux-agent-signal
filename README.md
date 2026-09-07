@@ -158,6 +158,7 @@ client unless one is given.
 | `list` | the session > window > pane tree the switcher shows |
 | `sync` | pull names and presence from Claude's session registry |
 | `summary` | recompute the status-right glyphs and the needs-you count |
+| `check` | report what is wired on this server and what is missing; exit 1 if broken |
 | `install-claude-hooks` | merge the hooks into `~/.claude/settings.json` (needs jq) |
 | `uninstall` | reverse everything the entry file set on the server |
 | `lock-path <window>` | print the lock directory for a window (debugging) |
@@ -388,8 +389,9 @@ the fixture and helpers. CI runs lint and the suite on Ubuntu and macOS.
 
 ## Troubleshooting
 
-- **Nothing changes.** Run `agent-signal set blocked` inside a pane. If the tab
-  changes, tmux is fine and the hooks are not firing: check
+- **Nothing changes.** Run `agent-signal check` inside a pane: it says what is
+  and is not wired. If everything is ok there, run `agent-signal set blocked`;
+  if the tab changes, tmux is fine and the hooks are not firing, so check
   `~/.claude/settings.json` and open `/hooks` in Claude to reload.
 - **Copy-mode keys or plugin hooks stop working during a Homebrew tmux
   upgrade.** Homebrew unlinks `tmux` from `/usr/local/bin` while it builds.
