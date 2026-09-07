@@ -130,6 +130,8 @@ echo "multi-pane aggregation"
 hook "$P_WEB" UserPromptSubmit
 hook "$P_WEB2" PermissionRequest
 is "blocked pane outranks working pane" "$(wst "$W_WEB")" blocked
+hook "$P_WEB" PermissionRequest
+is "two blocked panes in one window count as one window needing you" "$(gneeds)" 1
 hook "$P_WEB2" PostToolUse
 hook "$P_WEB" Stop
 is "done outranks working"           "$(wst "$W_WEB")" "done"
@@ -177,6 +179,7 @@ echo "summary and listing"
 hook "$P_API" UserPromptSubmit
 case $(gsum) in *"✳$(T display -p -t "$W_API" '#{window_index}')"*) ok "summary shows glyph+window index" ;; *) bad "summary" "$(gsum)" "...✳<index>..." ;; esac
 is "summary entries are space separated" "$(gsum | tr -cd ' ' | wc -c | tr -d ' ')" 2
+is "summary leaves no temp files"         "$(ls "${TMPDIR:-/tmp}"/agent-signal.[0-9]* 2>/dev/null | wc -l | tr -d ' ')" 0
 is "list has session, window and pane rows" "$("$AS" list | cut -f1 | sort -u | tr -d '\n')" "PSW"
 T set-option -g @agent_signal_ascii on; hook "$P_API" Stop
 is "ascii preset uses + for done"    "$(wicon "$W_API")" "+"

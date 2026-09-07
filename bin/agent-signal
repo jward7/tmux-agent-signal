@@ -11,7 +11,8 @@
 #   global @agent_summary  one coloured glyph per agent pane, for status-right
 #   global @agent_needs    count of windows needing you (blocked or ask), for titles
 #   window @agent_hold    wait | park                (user triage override)
-#   window @agent_icon / @agent_fg / @agent_bg       what the status bar draws
+#   window @agent_icon / @agent_fg                   what the status bar draws
+#   window @agent_tab_owned  1 when window-status-style was set by us
 #
 # Usage:
 #   agent-signal hook <ClaudeHookEvent>        Claude Code hook entry (JSON on stdin)
@@ -219,34 +220,30 @@ EOF2
   refresh_summary
 }
 
-glyph_for() { # glyph_for <kind>
-  case $1 in
-    claude) opt @agent_signal_glyph_claude '✳' ;;
-    codex)  opt @agent_signal_glyph_codex '⬢' ;;
-    pi)     opt @agent_signal_glyph_pi 'π' ;;
-    *)      opt @agent_signal_glyph_other '●' ;;
-  esac
-}
-
 refresh_summary() { # one glyph per agent pane, coloured by state; count of windows needing you
-  glyphs=""; needs=0
-  # window_id first: `read` strips leading IFS whitespace, so an empty first field would shift the rest
-  t list-panes -a -F '#{window_id}	#{?@agent_kind,#{@agent_kind},-}	#{?@agent_pane_state,#{@agent_pane_state},-}	#{window_index}' | while IFS='	' read -r wid kind st widx; do
-    [ "$kind" != - ] || continue
-    [ "$st" = - ] && st=""
-    case $st in
-      working) c=$(opt @agent_signal_colour_working yellow) ;;
-      blocked) c=$(opt @agent_signal_colour_blocked colour208) ;;
-      ask)     c=$(opt @agent_signal_colour_ask colour213) ;;
-      done)    c=$(opt @agent_signal_colour_done green) ;;
-      *)       c=$(opt @agent_signal_colour_idle colour245) ;;
-    esac
-    # "<glyph><window index>" so the summary doubles as a jump list: prefix + <index>
-    printf '%s\t%s\n' "#[fg=$c]$(glyph_for "$kind")$widx" "$( needs_you "$st" && printf '%s' "$wid" )"
-  done > "${TMPDIR:-/tmp}/agent-signal.$$"
-  glyphs=$(cut -f1 "${TMPDIR:-/tmp}/agent-signal.$$" | tr '\n' ' ' | sed 's/ $//')
-  needs=$(cut -f2 "${TMPDIR:-/tmp}/agent-signal.$$" | grep -c .)
-  rm -f "${TMPDIR:-/tmp}/agent-signal.$$"
+  # Read the nine colour/glyph options once, not once per pane.
+  c_working=$(opt @agent_signal_colour_working yellow)
+  c_blocked=$(opt @agent_signal_colour_blocked colour208)
+  c_ask=$(opt @agent_signal_colour_ask colour213)
+  c_done=$(opt @agent_signal_colour_done green)
+  c_idle=$(opt @agent_signal_colour_idle colour245)
+  g_claude=$(opt @agent_signal_glyph_claude '✳')
+  g_codex=$(opt @agent_signal_glyph_codex '⬢')
+  g_pi=$(opt @agent_signal_glyph_pi 'π')
+  g_other=$(opt @agent_signal_glyph_other '●')
+  # One list-panes, one awk: prints "<glyphs>\t<windows needing you>". Dead panes
+  # (remain-on-exit) are skipped so a crashed agent does not linger as a glyph.
+  out=$(t list-panes -a -F '#{window_id}	#{?@agent_kind,#{@agent_kind},-}	#{?@agent_pane_state,#{@agent_pane_state},-}	#{window_index}	#{pane_dead}' \
+    | awk -F'	' -v cw="$c_working" -v cb="$c_blocked" -v ca="$c_ask" -v cd="$c_done" -v ci="$c_idle" \
+          -v gc="$g_claude" -v gx="$g_codex" -v gp="$g_pi" -v go="$g_other" '
+      $2 == "-" || $5 == "1" { next }
+      { c = ci; if ($3 == "working") c = cw; else if ($3 == "blocked") c = cb; else if ($3 == "ask") c = ca; else if ($3 == "done") c = cd
+        g = go; if ($2 == "claude") g = gc; else if ($2 == "codex") g = gx; else if ($2 == "pi") g = gp
+        # "<glyph><window index>" so the summary doubles as a jump list: prefix + <index>
+        glyphs = glyphs (glyphs == "" ? "" : " ") "#[fg=" c "]" g $4
+        if (($3 == "blocked" || $3 == "ask") && !seen[$1]++) needs++ }
+      END { printf "%s\t%d\n", glyphs, needs }')
+  glyphs=${out%	*}; needs=${out#*	}
   if [ -n "$glyphs" ]; then t set-option -g @agent_summary "${glyphs}#[default] "; else t set-option -gu @agent_summary; fi
   if [ "$needs" -gt 0 ]; then t set-option -g @agent_needs "$needs"; else t set-option -gu @agent_needs; fi
 }
