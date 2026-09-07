@@ -134,13 +134,11 @@ always call
 "$(tmux show -gv @agent_signal_command)" set blocked
 ```
 
-Pointers:
-
-- **Codex CLI**: `hooks` in `~/.codex/config.toml`, map turn start/end to
-  working/done, approval prompts to blocked, and questions to ask.
-- **Pi**: an extension on `agent_start`, `agent_settled` and
-  `ui_prompt_start`, calling `agent-signal set` via child_process.
-- **OpenCode**: a plugin on the equivalent events.
+Ready-made mappings for Codex CLI, Gemini CLI, Copilot CLI, OpenCode and
+Pi are in [`integrations/`](integrations/), each a one-file drop with its
+event table. They were written from the vendors' documentation and are not
+exercised here, so reports and fixes from people who run those agents are
+welcome.
 
 ### Command reference
 

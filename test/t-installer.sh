@@ -18,4 +18,9 @@ is "re-running keeps the original backup"        "$(cmp -s "$FIX/first-backup" "
 is "installer leaves no temp files"              "$(find "$FIX/.claude" -name 'settings.json.??????' | wc -l | tr -d ' ')" 0
 rm -rf "$FIX"
 
+for f in integrations/gemini/settings-hooks.json integrations/copilot/hooks.json; do
+  is "$f is valid JSON" "$(jq -e . "$ROOT/$f" >/dev/null 2>&1 && echo ok)" ok
+done
+is "integration hook files resolve the command through tmux, never a path" "$(grep -L 'tmux show -gv @agent_signal_command' "$ROOT"/integrations/*/*.json "$ROOT"/integrations/*/*.js "$ROOT"/integrations/*/*.ts | wc -l | tr -d ' ')" 0
+
 finish

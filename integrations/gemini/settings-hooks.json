@@ -1,0 +1,10 @@
+{
+  "hooks": {
+    "SessionStart": [{ "hooks": [{ "type": "command", "name": "tmux-agent-signal", "command": "AGENT_KIND=gemini \"$(tmux show -gv @agent_signal_command)\" set idle" }] }],
+    "BeforeAgent":  [{ "hooks": [{ "type": "command", "name": "tmux-agent-signal", "command": "AGENT_KIND=gemini \"$(tmux show -gv @agent_signal_command)\" set working" }] }],
+    "AfterTool":    [{ "hooks": [{ "type": "command", "name": "tmux-agent-signal", "command": "AGENT_KIND=gemini \"$(tmux show -gv @agent_signal_command)\" set working" }] }],
+    "Notification": [{ "hooks": [{ "type": "command", "name": "tmux-agent-signal", "command": "AGENT_KIND=gemini \"$(tmux show -gv @agent_signal_command)\" set blocked" }] }],
+    "AfterAgent":   [{ "hooks": [{ "type": "command", "name": "tmux-agent-signal", "command": "AGENT_KIND=gemini \"$(tmux show -gv @agent_signal_command)\" set done" }] }],
+    "SessionEnd":   [{ "hooks": [{ "type": "command", "name": "tmux-agent-signal", "command": "\"$(tmux show -gv @agent_signal_command)\" clear" }] }]
+  }
+}

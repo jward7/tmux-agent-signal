@@ -1,0 +1,12 @@
+{
+  "version": 1,
+  "hooks": {
+    "sessionStart":         [{ "type": "command", "bash": "AGENT_KIND=copilot \"$(tmux show -gv @agent_signal_command)\" set idle" }],
+    "userPromptSubmitted":  [{ "type": "command", "bash": "AGENT_KIND=copilot \"$(tmux show -gv @agent_signal_command)\" set working" }],
+    "postToolUse":          [{ "type": "command", "bash": "AGENT_KIND=copilot \"$(tmux show -gv @agent_signal_command)\" set working" }],
+    "postToolUseFailure":   [{ "type": "command", "bash": "AGENT_KIND=copilot \"$(tmux show -gv @agent_signal_command)\" set working" }],
+    "permissionRequest":    [{ "type": "command", "bash": "AGENT_KIND=copilot \"$(tmux show -gv @agent_signal_command)\" set blocked" }],
+    "agentStop":            [{ "type": "command", "bash": "AGENT_KIND=copilot \"$(tmux show -gv @agent_signal_command)\" set done" }],
+    "sessionEnd":           [{ "type": "command", "bash": "\"$(tmux show -gv @agent_signal_command)\" clear" }]
+  }
+}
