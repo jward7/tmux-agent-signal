@@ -23,4 +23,10 @@ for f in integrations/gemini/settings-hooks.json integrations/copilot/hooks.json
 done
 is "integration hook files resolve the command through tmux, never a path" "$(grep -L 'tmux show -gv @agent_signal_command' "$ROOT"/integrations/*/*.json "$ROOT"/integrations/*/*.js "$ROOT"/integrations/*/*.ts | wc -l | tr -d ' ')" 0
 
+is "plugin manifest is valid JSON with a name"       "$(jq -r .name "$ROOT/.claude-plugin/plugin.json")" tmux-agent-signal
+is "marketplace lists the plugin at the repo root"     "$(jq -r '.plugins[0].source' "$ROOT/.claude-plugin/marketplace.json")" "./"
+is "plugin hooks cover the same nine events as the installer" "$(jq -r '.hooks | keys | length' "$ROOT/hooks/hooks.json")" 9
+is "plugin hooks locate the script via CLAUDE_PLUGIN_ROOT" "$(jq -r '.hooks[][].hooks[].command' "$ROOT/hooks/hooks.json" | grep -vc CLAUDE_PLUGIN_ROOT)" 0
+is "plugin manifest version matches the script"        "$(jq -r .version "$ROOT/.claude-plugin/plugin.json")" "$(TMUX='' "$AS" version)"
+
 finish

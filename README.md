@@ -86,7 +86,19 @@ run-shell '/path/to/tmux-agent-signal/agent-signal.tmux'
 
 ### Claude Code hooks
 
-Run once (needs `jq`; merges with any existing hooks and keeps a backup):
+The repo is also a Claude Code plugin, so the quickest route is:
+
+```
+/plugin marketplace add jward7/tmux-agent-signal
+/plugin install tmux-agent-signal@jward7
+```
+
+New sessions report immediately; running ones after `/reload-plugins`. The
+plugin carries its own copy of the script and wires the tmux server up on
+its first event, so it works even before tpm has loaded the tmux side.
+
+If you'd rather keep hooks in your own settings, run once (needs `jq`;
+merges with any existing hooks and keeps a backup):
 
 ```sh
 ~/.tmux/plugins/tmux-agent-signal/bin/agent-signal install-claude-hooks

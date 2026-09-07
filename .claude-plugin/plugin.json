@@ -1,0 +1,10 @@
+{
+  "name": "tmux-agent-signal",
+  "version": "0.2.1",
+  "description": "Show this session's state (working, blocked, asking, done) in the tmux window list.",
+  "author": { "name": "Justin Ward" },
+  "repository": "https://github.com/jward7/tmux-agent-signal",
+  "license": "MIT",
+  "keywords": ["tmux", "status-bar", "hooks"],
+  "hooks": "./hooks/hooks.json"
+}

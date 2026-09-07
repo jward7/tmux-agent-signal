@@ -1,0 +1,11 @@
+{
+  "name": "jward7",
+  "owner": { "name": "Justin Ward" },
+  "plugins": [
+    {
+      "name": "tmux-agent-signal",
+      "source": "./",
+      "description": "Show this session's state (working, blocked, asking, done) in the tmux window list."
+    }
+  ]
+}
