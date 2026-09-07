@@ -130,7 +130,8 @@ alert_command() { # alert_command <state> <prev> <window> <pane>
   cmd=$(opt @agent_signal_alert_command "")
   [ -n "$cmd" ] || return 0
   case " $(opt @agent_signal_alert_states "blocked ask done") " in *" $1 "*) ;; *) return 0 ;; esac
-  expanded=$(t display -p -t "$3" "$cmd")
+  # display-message runs strftime over its output, so protect literal % signs.
+  expanded=$(t display -p -t "$3" "$(printf '%s' "$cmd" | sed 's/%/%%/g')")
   (AGENT_SIGNAL_STATE=$1 AGENT_SIGNAL_PREV=$2 AGENT_SIGNAL_WINDOW=$3 AGENT_SIGNAL_PANE=$4 \
      sh -c "$expanded" >/dev/null 2>&1 </dev/null &)
 }
@@ -478,13 +479,13 @@ install_claude_hooks() {
 # something the plugin relies on is not in place.
 check() {
   bad=0
-  say() { printf '  %-4s %s\n' "$1" "$2"; [ "$1" = fail ] && bad=1; }
+  say() { printf '  %-4s %s\n' "$1" "$2"; [ "$1" = fail ] && bad=1; return 0; }
   echo "agent-signal $(sed -n 's/^# agent-signal \([0-9.]*\):.*/\1/p' "$0") on tmux $(t display -p '#{version}')"
   [ -n "${TMUX:-}" ] && say ok "inside tmux ($TMUX_BIN)" || say fail "TMUX is not set: run this from a pane"
   [ "$(t show-option -gqv @agent_signal_command)" = "$SELF" ] && say ok "command path published" || say fail "@agent_signal_command not published: source agent-signal.tmux"
   case $(t show-option -gv window-status-format) in *@agent_icon*) say ok "badge in window-status-format" ;; *) say fail "badge missing from window-status-format" ;; esac
   case $(t show-option -gv status-right) in *@agent_summary*) say ok "summary in status-right" ;; *) say warn "summary not in status-right" ;; esac
-  n=$(t show-hooks -g | grep -c "agent-signal"); [ "$n" -ge 6 ] && say ok "$n hooks installed" || say fail "only $n of 6 hooks installed"
+  n=$(t show-hooks -g | grep -c "agent-signal"); [ "$n" -ge 5 ] && say ok "$n hooks installed" || say fail "only $n of 5 hooks installed"
   for k in next switcher wait park; do
     key=$(opt "@agent_signal_key_$k" "")
     [ -z "$key" ] && { case $k in next) key=N ;; switcher) key=A ;; wait) key=W ;; park) key=P ;; esac; }
