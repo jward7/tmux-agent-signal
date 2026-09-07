@@ -83,6 +83,23 @@ hook "$P_API" PreToolUse '{"tool_name":"Bash"}'
 hook "$P_API" Notification '{"notification_type":"idle_prompt"}'
 is "idle_prompt rescues an interrupted turn -> done" "$(wst "$W_API")" "done"
 
+echo "hook exit codes"
+printf '{"notification_type":"idle_prompt"}' | TMUX_PANE=$P_API "$AS" hook Notification; rc=$?
+is "idle_prompt on a pane with nothing to rescue exits 0" "$rc" 0
+
+echo "concurrent hooks"
+# Two hooks for panes in the same window racing: the blocked one must win.
+W_RACE=$(T new-window -d -n race -P -F '#{window_id}')
+P_R1=$(T list-panes -t "$W_RACE" -F '#{pane_id}'); P_R2=$(T split-window -d -t "$W_RACE" -P -F '#{pane_id}')
+i=0; while [ $i -lt 10 ]; do
+  hook "$P_R1" PostToolUse & hook "$P_R2" PermissionRequest & wait
+  [ "$(wst "$W_RACE")" = blocked ] || break
+  hook "$P_R2" PostToolUse; i=$((i + 1))
+done
+is "10 racing PostToolUse/PermissionRequest rounds all ended blocked" "$i" 10
+hook "$P_R1" SessionEnd; hook "$P_R2" SessionEnd; T kill-window -t "$W_RACE"
+is "no lock directories left behind" "$(ls -d "${TMPDIR:-/tmp}"/agent-signal.*.lock.* 2>/dev/null | wc -l | tr -d ' ')" 0
+
 echo "viewed -> idle"
 T select-window -t "$W_API"; sleep 0.5
 is "viewing a done window clears it (after-select-window hook)" "$(wst "$W_API")" ""
@@ -137,6 +154,14 @@ hook "$P_WEB2" Stop; T select-window -t "$W_API"; sleep 0.3
 "$AS" next
 is "next skips a parked window"      "$(T display -p '#{window_id}')" "$W_API"
 "$AS" hold clear "$W_WEB"
+
+echo "awkward names"
+T rename-session -t main 'my proj'
+hook "$P_WEB2" PermissionRequest; T select-window -t "$W_API"
+"$AS" next
+is "next finds a blocked window in a session whose name has a space" "$(T display -p '#{window_id}')" "$W_WEB"
+hook "$P_WEB2" Stop; T select-window -t "$W_API"; sleep 0.3
+T rename-session -t 'my proj' main
 
 echo "summary and listing"
 hook "$P_API" UserPromptSubmit
