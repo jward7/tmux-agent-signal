@@ -14,6 +14,8 @@ pass=0; fail=0
 ok()   { pass=$((pass + 1)); printf '  ok   %s\n' "$1"; }
 bad()  { fail=$((fail + 1)); printf '  FAIL %s\n       got: [%s]  want: [%s]\n' "$1" "$2" "$3"; }
 is()   { if [ "$2" = "$3" ]; then ok "$1"; else bad "$1" "$2" "$3"; fi; }
+# Async hooks (run-shell -b) finish on their own schedule: poll for a window state.
+waitfor() { i=0; while [ "$(wst "$1")" != "$2" ] && [ $i -lt 100 ]; do sleep 0.05; i=$((i + 1)); done; }
 strip() { sed 's/#\[[^]]*\]//g'; }
 
 # --- fixture ---------------------------------------------------------------
@@ -46,6 +48,9 @@ case $(T show-option -gv window-status-format) in *@agent_icon*) ok "badge appen
 case $(T show-option -gv status-right) in "#{@agent_summary}"*) ok "summary prepended to status-right" ;; *) bad "summary prepended" "$(T show-option -gv status-right)" "#{@agent_summary}..." ;; esac
 is "next key bound"     "$(T list-keys -T prefix | grep -c 'agent-signal next')" 1
 is "seen hook installed" "$(T show-hooks -g | grep -c 'after-select-window\[91\]')" 1
+sh "$ROOT/agent-signal.tmux"
+is "sourcing the entry file twice appends the badge once (2 mentions per badge)" "$(T show-option -gv window-status-format | grep -o agent_icon | wc -l | tr -d ' ')" 2
+is "sourcing twice prepends the summary once"             "$(T show-option -gv status-right | grep -o agent_summary | wc -l | tr -d ' ')" 1
 
 echo "claude hook mapping (hidden window)"
 hook "$P_API" SessionStart
@@ -108,7 +113,7 @@ hook "$P_R1" SessionEnd; hook "$P_R2" SessionEnd; T kill-window -t "$W_RACE"
 is "no lock directories left behind" "$(ls -d "${TMPDIR:-/tmp}"/agent-signal.*.lock.* 2>/dev/null | wc -l | tr -d ' ')" 0
 
 echo "viewed -> idle"
-T select-window -t "$W_API"; sleep 0.5
+T select-window -t "$W_API"; waitfor "$W_API" ""
 is "viewing a done window clears it (after-select-window hook)" "$(wst "$W_API")" ""
 is "all three seen hooks name their own window" "$(T show-hooks -g | grep -c 'seen #{window_id}')" 3
 hook "$P_WEB" Stop
@@ -118,7 +123,7 @@ hook "$P_API" UserPromptSubmit; hook "$P_API" Stop
 # No client is attached to the test server, so nobody is "looking": done must show.
 is "finishing in the active window of a detached session still shows done" "$(wst "$W_API")" "done"
 hook "$P_API" SessionEnd
-T select-window -t "$W_WEB"; sleep 0.3
+T select-window -t "$W_WEB"; waitfor "$W_WEB" ""
 
 echo "theme safety"
 T set-option -w -t "$W_WEB" window-status-style 'fg=cyan,bg=blue'
@@ -162,7 +167,7 @@ hook "$P_API" Stop                                   # api: done (hidden? no, vi
 hook "$P_WEB2" PermissionRequest                     # web: blocked
 "$AS" next
 is "next jumps to the blocked window" "$(T display -p '#{window_id}')" "$W_WEB"
-hook "$P_WEB2" Stop; T select-window -t "$W_API"; sleep 0.3
+hook "$P_WEB2" Stop; T select-window -t "$W_API"; waitfor "$W_API" ""
 "$AS" hold park "$W_WEB"
 "$AS" next
 is "next skips a parked window"      "$(T display -p '#{window_id}')" "$W_API"
@@ -173,7 +178,7 @@ T rename-session -t main 'my proj'
 hook "$P_WEB2" PermissionRequest; T select-window -t "$W_API"
 "$AS" next
 is "next finds a blocked window in a session whose name has a space" "$(T display -p '#{window_id}')" "$W_WEB"
-hook "$P_WEB2" Stop; T select-window -t "$W_API"; sleep 0.3
+hook "$P_WEB2" Stop; T select-window -t "$W_API"; waitfor "$W_API" ""
 T rename-session -t 'my proj' main
 T rename-window -t "$W_WEB" ''
 is "list survives an empty window name" "$("$AS" list 2>&1 | grep -c 'integer expression')" 0
