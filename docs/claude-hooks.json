@@ -7,6 +7,7 @@
     "PermissionRequest": [{ "matcher": "", "hooks": [{ "type": "command", "command": "$HOME/.tmux/plugins/tmux-agent-signal/bin/agent-signal hook PermissionRequest", "async": true }] }],
     "Notification":      [{ "matcher": "", "hooks": [{ "type": "command", "command": "$HOME/.tmux/plugins/tmux-agent-signal/bin/agent-signal hook Notification",      "async": true }] }],
     "Stop":              [{ "matcher": "", "hooks": [{ "type": "command", "command": "$HOME/.tmux/plugins/tmux-agent-signal/bin/agent-signal hook Stop",              "async": true }] }],
+    "StopFailure":       [{ "matcher": "", "hooks": [{ "type": "command", "command": "$HOME/.tmux/plugins/tmux-agent-signal/bin/agent-signal hook StopFailure",       "async": true }] }],
     "SessionEnd":        [{ "matcher": "", "hooks": [{ "type": "command", "command": "$HOME/.tmux/plugins/tmux-agent-signal/bin/agent-signal hook SessionEnd",        "async": true }] }]
   }
 }

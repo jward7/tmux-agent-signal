@@ -388,14 +388,18 @@ list() {
 install_claude_hooks() {
   settings="$HOME/.claude/settings.json"
   command -v jq >/dev/null 2>&1 || { echo "jq is required to merge hooks; see docs/claude-hooks.json for a manual copy" >&2; exit 1; }
-  [ -f "$settings" ] || printf '{}\n' > "$settings"
-  cp "$settings" "$settings.bak-agent-signal"
-  tmp=$(mktemp) || exit 1
+  [ -f "$settings" ] || { mkdir -p "$(dirname "$settings")" && printf '{}\n' > "$settings"; }
+  # Keep the first backup: it is the only copy of the settings as they were before us.
+  [ -f "$settings.bak-agent-signal" ] || cp "$settings" "$settings.bak-agent-signal"
+  tmp=$(mktemp "$settings.XXXXXX") || exit 1
+  trap 'rm -f "$tmp"' EXIT INT TERM
+  # The path is double-quoted inside the command because Claude runs hooks
+  # through a shell and a plugin directory may contain spaces.
   jq --arg bin "$SELF" '
-    def entry($ev): {matcher: "", hooks: [{type: "command", command: ($bin + " hook " + $ev), async: true}]};
-    def add($ev): .hooks[$ev] = ((.hooks[$ev] // []) | map(select((.hooks // []) | any(.command | tostring | contains("agent-signal hook")) | not)) + [entry($ev)]);
+    def entry($ev): {matcher: "", hooks: [{type: "command", command: ("\"" + $bin + "\" hook " + $ev), async: true}]};
+    def add($ev): .hooks[$ev] = ((.hooks[$ev] // []) | map(select((.hooks // []) | any(.command | tostring | contains("agent-signal\" hook") or contains("agent-signal hook")) | not)) + [entry($ev)]);
     .hooks //= {} |
-    reduce ("SessionStart","UserPromptSubmit","PreToolUse","PostToolUse","PermissionRequest","Notification","Stop","SessionEnd") as $ev (.; add($ev))
+    reduce ("SessionStart","UserPromptSubmit","PreToolUse","PostToolUse","PermissionRequest","Notification","Stop","StopFailure","SessionEnd") as $ev (.; add($ev))
   ' "$settings" > "$tmp" && mv "$tmp" "$settings" && echo "hooks merged into $settings (backup: $settings.bak-agent-signal)"
 }
 
