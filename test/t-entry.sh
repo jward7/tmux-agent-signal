@@ -23,4 +23,10 @@ is "sourcing twice prepends the summary once"                                   
 
 is "the command path is published for other agents to find" "$(T show-option -gv @agent_signal_command)" "$AS"
 
+"$AS" uninstall >/dev/null
+hook "$P_API" PermissionRequest
+is "a hook before the entry file ran wires the server itself" "$(T show-option -gv window-status-format | grep -c agent_icon)" 1
+is "and the event is not lost" "$(wst "$W_API")" blocked
+hook "$P_API" SessionEnd
+
 finish

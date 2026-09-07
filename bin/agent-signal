@@ -270,7 +270,15 @@ refresh_summary() { # one glyph per agent pane, coloured by state; count of wind
   if [ "$needs" -gt 0 ]; then t set-option -g @agent_needs "$needs"; else t set-option -gu @agent_needs; fi
 }
 
+# A hook can fire before tmux has sourced the entry file (plugin installed,
+# tmux not yet reloaded). Wire the server up on the spot rather than dropping
+# the event; the entry file is idempotent, so a later reload changes nothing.
+bootstrap_if_needed() {
+  case $(t show-option -gqv window-status-format) in *@agent_icon*) ;; *) sh "$PLUGIN_DIR/agent-signal.tmux" >/dev/null 2>&1 ;; esac
+}
+
 set_state() { # set_state <state> [pane]
+  bootstrap_if_needed
   pane=$(resolve_pane "${2:-}")
   win=$(window_of "$pane") || exit 0
   lock_window "$win"
