@@ -133,21 +133,32 @@ style_for() { # style_for <state|hold> -> "icon fg bg"
 
 needs_you() { case $1 in blocked|ask) return 0 ;; *) return 1 ;; esac; }
 
+# Only ever unset a window-status-style that we set ourselves: a theme or the
+# user may have styled that window, and @agent_tab_owned records that the
+# current value is ours.
+restore_tab() { # restore_tab <window>
+  if [ "$(t show-option -wqv -t "$1" @agent_tab_owned)" = 1 ]; then
+    t set-option -uw -t "$1" window-status-style
+    t set-option -uw -t "$1" @agent_tab_owned
+  fi
+}
+
 paint_window() { # paint_window <window> <state-or-hold>
   set -- "$1" "$(style_for "$2")"
   if [ -z "$2" ]; then
     t set-option -uw -t "$1" @agent_icon
     t set-option -uw -t "$1" @agent_fg
-    t set-option -uw -t "$1" window-status-style
+    restore_tab "$1"
     return
   fi
   icon=${2%% *}; rest=${2#* }; fg=${rest%% *}; bg=${rest#* }
   t set-option -w -t "$1" @agent_icon "$icon"
   t set-option -w -t "$1" @agent_fg "$fg"
   if [ "$bg" = default ] || [ "$(opt @agent_signal_tab_colour on)" != on ]; then
-    t set-option -uw -t "$1" window-status-style
+    restore_tab "$1"
   else
     t set-option -w -t "$1" window-status-style "fg=$fg,bg=$bg,bold"
+    t set-option -w -t "$1" @agent_tab_owned 1
   fi
 }
 

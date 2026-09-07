@@ -92,6 +92,16 @@ is "finishing in the active window of a detached session still shows done" "$(ws
 hook "$P_API" SessionEnd
 T select-window -t "$W_WEB"; sleep 0.3
 
+echo "theme safety"
+T set-option -w -t "$W_WEB" window-status-style 'fg=cyan,bg=blue'
+hook "$P_WEB" UserPromptSubmit
+is "a user's per-window style survives a working state" "$(wstyle "$W_WEB")" "fg=cyan,bg=blue"
+hook "$P_WEB" PermissionRequest
+is "blocked overrides it while flagged"  "$(wstyle "$W_WEB")" "fg=black,bg=colour208,bold"
+hook "$P_WEB" SessionEnd
+is "clearing removes only our style"    "$(wstyle "$W_WEB")" ""
+T set-option -uw -t "$W_WEB" window-status-style
+
 echo "multi-pane aggregation"
 hook "$P_WEB" UserPromptSubmit
 hook "$P_WEB2" PermissionRequest
