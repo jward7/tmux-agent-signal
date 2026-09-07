@@ -318,16 +318,17 @@ seen() {
 
 next() {
   cur=$(current_window)
-  list=$(t list-windows -a -F '#{window_id} #{session_name} #{@agent_state} #{@agent_hold}')
+  # Tab separated, session *id* rather than name: names may contain spaces.
+  list=$(t list-windows -a -F '#{window_id}	#{session_id}	#{?@agent_state,#{@agent_state},-}	#{?@agent_hold,#{@agent_hold},-}')
   # rotate so we scan the windows after the current one first
-  after=$(printf '%s\n' "$list" | sed -n "/^$cur /,\$p" | sed '1d')
-  before=$(printf '%s\n' "$list" | sed "/^$cur /,\$d")
+  after=$(printf '%s\n' "$list" | sed -n "/^$cur	/,\$p" | sed '1d')
+  before=$(printf '%s\n' "$list" | sed "/^$cur	/,\$d")
   ordered=$(printf '%s\n%s\n' "$after" "$before")
   for want in blocked ask "done"; do
-    target=$(printf '%s\n' "$ordered" | awk -v w="$want" '$3==w && $4=="" {print $1" "$2; exit}')
+    target=$(printf '%s\n' "$ordered" | awk -F'	' -v w="$want" '$3==w && $4=="-" {print $1"\t"$2; exit}')
     if [ -n "$target" ]; then
-      t switch-client -t "${target#* }" 2>/dev/null
-      t select-window -t "${target%% *}"
+      t switch-client -t "${target#*	}" 2>/dev/null
+      t select-window -t "${target%%	*}"
       return 0
     fi
   done
