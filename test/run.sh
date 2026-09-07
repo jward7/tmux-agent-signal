@@ -1,4 +1,5 @@
 #!/bin/sh
+# shellcheck disable=SC1010,SC2209  # done, "wait", "park" are state words here, not keywords
 # End-to-end tests against an isolated tmux server. No daemon, no mocks: the
 # real script drives a real server (-L agent-signal-test, -f /dev/null).
 #
@@ -74,19 +75,19 @@ is "Notification permission_prompt -> blocked" "$(wst "$W_API")" blocked
 hook "$P_API" Stop '{"background_tasks":[{"id":"x"}]}'
 is "Stop with background task -> working" "$(wst "$W_API")" working
 hook "$P_API" Stop '{"background_tasks":[]}'
-is "Stop -> done (window hidden)"    "$(wst "$W_API")" "done"
+is "Stop -> done (window hidden)"    "$(wst "$W_API")" done
 is "done colours the tab green"      "$(wstyle "$W_API")" "fg=black,bg=green,bold"
 is "done does not count as needing you" "$(gneeds)" ""
 
 echo "idle reminder"
 hook "$P_API" Notification '{"notification_type":"idle_prompt"}'
-is "idle_prompt on a done pane leaves it done" "$(wst "$W_API")" "done"
+is "idle_prompt on a done pane leaves it done" "$(wst "$W_API")" done
 T set-option -up -t "$P_API" @agent_pane_state; "$AS" seen >/dev/null 2>&1; T set-option -uw -t "$W_API" @agent_state
 hook "$P_API" Notification '{"notification_type":"idle_prompt"}'
 is "idle_prompt on an idle pane stays idle" "$(wst "$W_API")" ""
 hook "$P_API" PreToolUse '{"tool_name":"Bash"}'
 hook "$P_API" Notification '{"notification_type":"idle_prompt"}'
-is "idle_prompt rescues an interrupted turn -> done" "$(wst "$W_API")" "done"
+is "idle_prompt rescues an interrupted turn -> done" "$(wst "$W_API")" done
 
 echo "no tmux on PATH"
 # With PATH empty the scripts must fall back to a known install path or exit 0,
@@ -121,7 +122,7 @@ hook "$P_WEB" Stop
 is "seen with an explicit window clears that window" "$(wst "$W_WEB")" ""
 hook "$P_API" UserPromptSubmit; hook "$P_API" Stop
 # No client is attached to the test server, so nobody is "looking": done must show.
-is "finishing in the active window of a detached session still shows done" "$(wst "$W_API")" "done"
+is "finishing in the active window of a detached session still shows done" "$(wst "$W_API")" done
 hook "$P_API" SessionEnd
 T select-window -t "$W_WEB"; waitfor "$W_WEB" ""
 
@@ -143,11 +144,11 @@ hook "$P_WEB" PermissionRequest
 is "two blocked panes in one window count as one window needing you" "$(gneeds)" 1
 hook "$P_WEB2" PostToolUse
 hook "$P_WEB" Stop
-is "done outranks working"           "$(wst "$W_WEB")" "done"
+is "done outranks working"           "$(wst "$W_WEB")" done
 hook "$P_WEB2" Stop
 hook "$P_WEB" SessionEnd
 is "SessionEnd clears its pane only" "$(pst "$P_WEB")" ""
-is "window keeps the other pane's state" "$(wst "$W_WEB")" "done"
+is "window keeps the other pane's state" "$(wst "$W_WEB")" done
 
 echo "wait and park"
 "$AS" hold wait "$W_WEB"
@@ -209,7 +210,7 @@ is "sed fallback reads spaced JSON -> ask"        "$(wst "$W_API")" ask
 nojq "$P_API" Stop '{"background_tasks": [ {"id": "x"} ]}'
 is "sed fallback sees a non-empty task array"     "$(wst "$W_API")" working
 nojq "$P_API" Stop '{"background_tasks": []}'
-is "sed fallback sees an empty task array -> done" "$(wst "$W_API")" "done"
+is "sed fallback sees an empty task array -> done" "$(wst "$W_API")" done
 hook "$P_API" SessionEnd; rm -rf "$NOJQ"
 
 echo "installer"

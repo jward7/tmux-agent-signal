@@ -1,4 +1,5 @@
 #!/bin/sh
+# shellcheck disable=SC1010,SC2209  # done, "wait", "park" are state words here, not keywords
 # agent-signal: per-window AI coding-agent state in the tmux status bar.
 #
 # State lives in tmux user options, written by agent hooks and read natively
@@ -192,7 +193,7 @@ unlock_window() { rmdir "${LOCK:-/nonexistent}" 2>/dev/null; trap - EXIT INT TER
 
 clear_done_panes() { # clear_done_panes <window>: acknowledge every done pane
   t list-panes -t "$1" -F '#{pane_id}	#{@agent_pane_state}' | while IFS='	' read -r p st; do
-    [ "$st" = "done" ] && t set-option -up -t "$p" @agent_pane_state
+    [ "$st" = done ] && t set-option -up -t "$p" @agent_pane_state
   done
 }
 
@@ -208,7 +209,7 @@ EOF2
     case $st in
       blocked) agg=blocked ;;
       ask)     [ "$agg" != blocked ] && agg=ask ;;
-      done)    needs_you "$agg" || agg="done" ;;
+      done)    needs_you "$agg" || agg=done ;;
       working) [ -z "$agg" ] && agg=working ;;
     esac
   done
@@ -219,7 +220,7 @@ EOF2
   fi
 
   # Finished while you were already looking at it -> nothing to flag.
-  if [ "$agg" = "done" ] && [ -n "$ev" ] && visible "$win"; then
+  if [ "$agg" = done ] && [ -n "$ev" ] && visible "$win"; then
     clear_done_panes "$win"
     agg=""
   fi
@@ -251,7 +252,7 @@ refresh_summary() { # one glyph per agent pane, coloured by state; count of wind
     | awk -F'	' -v cw="$c_working" -v cb="$c_blocked" -v ca="$c_ask" -v cd="$c_done" -v ci="$c_idle" \
           -v gc="$g_claude" -v gx="$g_codex" -v gp="$g_pi" -v go="$g_other" '
       $2 == "-" || $5 == "1" { next }
-      { c = ci; if ($3 == "working") c = cw; else if ($3 == "blocked") c = cb; else if ($3 == "ask") c = ca; else if ($3 == "done") c = cd
+      { c = ci; if ($3 == "working") c = cw; else if ($3 == "blocked") c = cb; else if ($3 == "ask") c = ca; else if ($3 == done) c = cd
         g = go; if ($2 == "claude") g = gc; else if ($2 == "codex") g = gx; else if ($2 == "pi") g = gp
         # "<glyph><window index>" so the summary doubles as a jump list: prefix + <index>
         glyphs = glyphs (glyphs == "" ? "" : " ") "#[fg=" c "]" g $4
@@ -301,10 +302,10 @@ hook() {
         idle_prompt)
           # Fires ~60s after any finish. Only a pane still marked working needs
           # rescuing (turn ended without a Stop, e.g. Esc); otherwise leave it.
-          if [ "$(pane_state "$(resolve_pane)")" = working ]; then set_state "done"; fi ;;
+          if [ "$(pane_state "$(resolve_pane)")" = working ]; then set_state done; fi ;;
       esac ;;
     Stop|StopFailure)
-      if json_array_nonempty '.background_tasks' background_tasks; then set_state working; else set_state "done"; fi ;;
+      if json_array_nonempty '.background_tasks' background_tasks; then set_state working; else set_state done; fi ;;
     SessionEnd)        set_state clear ;;
   esac
 }
@@ -333,7 +334,7 @@ current_window() { t display -p '#{window_id}'; }
 
 seen() { # seen [window]: the hook passes its own window so a second attached client is never confused
   win=${1:-$(current_window)}
-  [ "$(t show-option -wqv -t "$win" @agent_state)" = "done" ] || return 0
+  [ "$(t show-option -wqv -t "$win" @agent_state)" = done ] || return 0
   lock_window "$win"
   clear_done_panes "$win"
   refresh_window "$win"
@@ -348,7 +349,7 @@ next() {
   after=$(printf '%s\n' "$list" | sed -n "/^$cur	/,\$p" | sed '1d')
   before=$(printf '%s\n' "$list" | sed "/^$cur	/,\$d")
   ordered=$(printf '%s\n%s\n' "$after" "$before")
-  for want in blocked ask "done"; do
+  for want in blocked ask done; do
     target=$(printf '%s\n' "$ordered" | awk -F'	' -v w="$want" '$3==w && $4=="-" {print $1"\t"$2; exit}')
     if [ -n "$target" ]; then
       t switch-client -t "${target#*	}" 2>/dev/null

@@ -1,4 +1,5 @@
 #!/bin/sh
+# shellcheck disable=SC1010,SC2209  # done, "wait", "park" are state words here, not keywords
 # Hierarchical session > window > pane switcher with close and triage actions.
 # Runs inside `tmux display-popup`. Needs fzf.
 set -u
@@ -48,7 +49,7 @@ while :; do
       continue ;;
     ctrl-w|ctrl-p)
       [ -n "$win" ] || continue
-      mode="wait"; [ "$key" = ctrl-p ] && mode="park"
+      mode=wait; [ "$key" = ctrl-p ] && mode=park
       "$AS" hold "$mode" "$win"
       continue ;;
     *)
