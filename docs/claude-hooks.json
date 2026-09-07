@@ -1,13 +1,13 @@
 {
   "hooks": {
-    "SessionStart":      [{ "matcher": "", "hooks": [{ "type": "command", "command": "$HOME/.tmux/plugins/tmux-agent-signal/bin/agent-signal hook SessionStart",      "async": true }] }],
-    "UserPromptSubmit":  [{ "matcher": "", "hooks": [{ "type": "command", "command": "$HOME/.tmux/plugins/tmux-agent-signal/bin/agent-signal hook UserPromptSubmit",  "async": true }] }],
-    "PreToolUse":        [{ "matcher": "", "hooks": [{ "type": "command", "command": "$HOME/.tmux/plugins/tmux-agent-signal/bin/agent-signal hook PreToolUse",        "async": true }] }],
-    "PostToolUse":       [{ "matcher": "", "hooks": [{ "type": "command", "command": "$HOME/.tmux/plugins/tmux-agent-signal/bin/agent-signal hook PostToolUse",       "async": true }] }],
-    "PermissionRequest": [{ "matcher": "", "hooks": [{ "type": "command", "command": "$HOME/.tmux/plugins/tmux-agent-signal/bin/agent-signal hook PermissionRequest", "async": true }] }],
-    "Notification":      [{ "matcher": "", "hooks": [{ "type": "command", "command": "$HOME/.tmux/plugins/tmux-agent-signal/bin/agent-signal hook Notification",      "async": true }] }],
-    "Stop":              [{ "matcher": "", "hooks": [{ "type": "command", "command": "$HOME/.tmux/plugins/tmux-agent-signal/bin/agent-signal hook Stop",              "async": true }] }],
-    "StopFailure":       [{ "matcher": "", "hooks": [{ "type": "command", "command": "$HOME/.tmux/plugins/tmux-agent-signal/bin/agent-signal hook StopFailure",       "async": true }] }],
-    "SessionEnd":        [{ "matcher": "", "hooks": [{ "type": "command", "command": "$HOME/.tmux/plugins/tmux-agent-signal/bin/agent-signal hook SessionEnd",        "async": true }] }]
+    "SessionStart":      [{ "matcher": "", "hooks": [{ "type": "command", "command": "\"$HOME/.tmux/plugins/tmux-agent-signal/bin/agent-signal\" hook SessionStart",      "async": true }] }],
+    "UserPromptSubmit":  [{ "matcher": "", "hooks": [{ "type": "command", "command": "\"$HOME/.tmux/plugins/tmux-agent-signal/bin/agent-signal\" hook UserPromptSubmit",  "async": true }] }],
+    "PreToolUse":        [{ "matcher": "", "hooks": [{ "type": "command", "command": "\"$HOME/.tmux/plugins/tmux-agent-signal/bin/agent-signal\" hook PreToolUse",        "async": true }] }],
+    "PostToolUse":       [{ "matcher": "", "hooks": [{ "type": "command", "command": "\"$HOME/.tmux/plugins/tmux-agent-signal/bin/agent-signal\" hook PostToolUse",       "async": true }] }],
+    "PermissionRequest": [{ "matcher": "", "hooks": [{ "type": "command", "command": "\"$HOME/.tmux/plugins/tmux-agent-signal/bin/agent-signal\" hook PermissionRequest", "async": true }] }],
+    "Notification":      [{ "matcher": "", "hooks": [{ "type": "command", "command": "\"$HOME/.tmux/plugins/tmux-agent-signal/bin/agent-signal\" hook Notification",      "async": true }] }],
+    "Stop":              [{ "matcher": "", "hooks": [{ "type": "command", "command": "\"$HOME/.tmux/plugins/tmux-agent-signal/bin/agent-signal\" hook Stop",              "async": true }] }],
+    "StopFailure":       [{ "matcher": "", "hooks": [{ "type": "command", "command": "\"$HOME/.tmux/plugins/tmux-agent-signal/bin/agent-signal\" hook StopFailure",       "async": true }] }],
+    "SessionEnd":        [{ "matcher": "", "hooks": [{ "type": "command", "command": "\"$HOME/.tmux/plugins/tmux-agent-signal/bin/agent-signal\" hook SessionEnd",        "async": true }] }]
   }
 }

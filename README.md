@@ -14,7 +14,7 @@ you were elsewhere (green), `4:infra` is asking a question (pink), `1:api` and
 State is written by the agent's own lifecycle hooks into tmux user options and
 read natively by the status line. Nothing runs on redraw. Claude Code is wired
 up out of the box; any agent with hooks or an extension API can report the
-same three words.
+same few words.
 
 ## States
 
@@ -93,8 +93,9 @@ Run once (needs `jq`; merges with any existing hooks and keeps a backup):
 ```
 
 or copy [`docs/claude-hooks.json`](docs/claude-hooks.json) into
-`~/.claude/settings.json` by hand. Then open `/hooks` in a running session, or
-start a new one, so Claude reloads its config.
+`~/.claude/settings.json` by hand (Claude runs hook commands through a shell,
+so `$HOME` expands and the quoted path survives spaces). Then open `/hooks` in
+a running session, or start a new one, so Claude reloads its config.
 
 | Claude event                                  | State   |
 |-----------------------------------------------|---------|
@@ -104,7 +105,7 @@ start a new one, so Claude reloads its config.
 | `PermissionRequest`, `Notification` permission_prompt | blocked |
 | `Notification` elicitation, agent_needs_input | ask |
 | `Notification` idle_prompt                    | done, but only if the pane is still marked working (a turn ended with Esc skips `Stop`). Otherwise ignored, since this fires a minute after every finish |
-| `Stop` with no background tasks               | done    |
+| `Stop` or `StopFailure` with no background tasks | done    |
 | `Stop` while a background task is still running | working, until a later `Stop` reports it finished |
 | `SessionEnd`                                  | cleared |
 
@@ -127,11 +128,32 @@ The pane defaults to `$TMUX_PANE`, which tmux exports to every process in the
 pane. Set `AGENT_KIND=codex` (or `pi`, `opencode`, ...) in the environment so
 the switcher labels it. Pointers:
 
-- **Codex CLI**: `hooks` in `~/.codex/config.toml`, map turn start/end and
-  approval prompts to working/done/blocked.
+- **Codex CLI**: `hooks` in `~/.codex/config.toml`, map turn start/end to
+  working/done, approval prompts to blocked, and questions to ask.
 - **Pi**: an extension on `agent_start`, `agent_settled` and
   `ui_prompt_start`, calling `agent-signal set` via child_process.
 - **OpenCode**: a plugin on the equivalent events.
+
+### Command reference
+
+All commands take the pane from `$TMUX_PANE` or the window from the current
+client unless one is given.
+
+| Command | What it does |
+|---|---|
+| `hook <Event>` | Claude Code hook entry; reads the hook JSON on stdin |
+| `set working\|blocked\|ask\|done\|idle [pane]` | report a state for any agent |
+| `clear [pane]` | the agent exited; drop its state, kind and name |
+| `seen [window]` | mark a done window as viewed (the hooks call this) |
+| `next` | switch to the next blocked window, else ask, else done, skipping wait and park |
+| `hold wait\|park\|clear [window]` | toggle a triage hold |
+| `list` | the session > window > pane tree the switcher shows |
+| `sync` | pull names and presence from Claude's session registry |
+| `summary` | recompute the status-right glyphs and the needs-you count |
+| `install-claude-hooks` | merge the hooks into `~/.claude/settings.json` (needs jq) |
+| `uninstall` | reverse everything the entry file set on the server |
+| `lock-path <window>` | print the lock directory for a window (debugging) |
+| `help`, `version` | |
 
 ### Uninstall
 
@@ -303,13 +325,19 @@ is the smallest option that still covers triage and navigation.
 ## How it works
 
 ```
-Claude hook ──> agent-signal hook Stop ──> tmux set -p @agent_state done
+Claude hook ──> agent-signal hook Stop ──> tmux set -p @agent_pane_state done
                                         └─> recompute window: @agent_state,
                                             @agent_icon, @agent_fg, window-status-style
+                                        └─> recompute @agent_summary, @agent_needs
                                         └─> not on screen? play sound
 window-status-format reads #{@agent_icon} / #{@agent_fg}
-after-select-window hook ──> agent-signal seen ──> done -> idle
+status-right reads #{@agent_summary}
+after-select-window hook ──> agent-signal seen <window> ──> done -> idle
 ```
+
+Claude runs hooks concurrently, so each update takes a lock keyed on the
+server socket and window id (a `mkdir` in `$TMPDIR`, reclaimed if a holder
+was killed) before reading and rewriting the window's state.
 
 Per-pane state lets several agents share a window. The window shows the most
 urgent pane. Pane state is stored under `@agent_pane_state`, a different name
@@ -350,7 +378,8 @@ the fixture and helpers. CI runs lint and the suite on Ubuntu and macOS.
   upgrade.** Homebrew unlinks `tmux` from `/usr/local/bin` while it builds.
   Plugins that shell out to `tmux` (tmux-yank, tmux-copycat) fail until it is
   relinked. This plugin looks for the Cellar binary as a fallback, so it keeps
-  working. Wait for brew to finish, or `brew link tmux`.
+  working until brew deletes the old version, at which point see the next
+  item. Wait for brew to finish, or `brew link tmux`.
 - **Icons render as boxes or gaps.** Your font lacks ✓ or …. Set
   `@agent_signal_ascii on`, or give each state your own icon.
 - **New windows or splits die instantly after a Homebrew tmux upgrade.** The
