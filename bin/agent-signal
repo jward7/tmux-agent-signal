@@ -379,19 +379,20 @@ list() {
   sync_registry
   t list-sessions -F '#{session_name}' | while read -r s; do
     sstate=$(t list-windows -t "$s" -F '#{@agent_state}' | awk '/blocked/{b=1} /ask/{a=1} /done/{d=1} /working/{w=1} END{if(b)print "!";else if(a)print "?";else if(d)print "+";else if(w)print "~"}')
-    printf 'S\t%s\t%-2s %s\n' "$s" "$sstate" "$s"
+    printf 'S\t%s\t%s %s\n' "$s" "${sstate:- }" "$s"
     # tab-separated; empty fields are sent as "-" because `read` collapses runs of tabs
     t list-windows -t "$s" -F '#{window_id}	#{window_index}	#{?window_name,#{window_name},-}	#{?@agent_state,#{@agent_state},-}	#{?@agent_hold,#{@agent_hold},-}	#{window_panes}' \
     | while IFS='	' read -r wid idx name st hd np; do
         [ "$name" = - ] && name=""; [ "$st" = - ] && st=""; [ "$hd" = - ] && hd=""
         mark=$(style_for "${hd:-$st}"); mark=${mark%% *}
-        printf 'W\t%s\t%-2s   %s:%s%s\n' "$wid" "${mark:-}" "$idx" "$name" "${hd:+ ($hd)}"
+        # icons are multibyte, so pad with a literal rather than %-2s (which counts bytes)
+        printf 'W\t%s\t%s    %s:%s%s\n' "$wid" "${mark:- }" "$idx" "$name" "${hd:+ ($hd)}"
         [ "$np" -gt 1 ] || [ -n "$st" ] || continue
         t list-panes -t "$wid" -F '#{pane_id}	#{pane_index}	#{?pane_current_command,#{pane_current_command},-}' \
         | while IFS='	' read -r pid pidx pc; do
             pst=$(pane_state "$pid"); pk=$(pane_opt "$pid" @agent_kind); pn=$(pane_opt "$pid" @agent_name)
             m=$(style_for "$pst"); m=${m%% *}
-            printf 'P\t%s\t%-2s      %s: %s\n' "$pid" "${m:-}" "$pidx" "${pn:-${pk:-$pc}}"
+            printf 'P\t%s\t%s       %s: %s\n' "$pid" "${m:- }" "$pidx" "${pn:-${pk:-$pc}}"
           done
       done
   done

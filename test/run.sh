@@ -190,6 +190,10 @@ case $(gsum) in *"✳$(T display -p -t "$W_API" '#{window_index}')"*) ok "summar
 is "summary entries are space separated" "$(gsum | tr -cd ' ' | wc -c | tr -d ' ')" 2
 is "summary leaves no temp files"         "$(ls "${TMPDIR:-/tmp}"/agent-signal.[0-9]* 2>/dev/null | wc -l | tr -d ' ')" 0
 is "list has session, window and pane rows" "$("$AS" list | cut -f1 | sort -u | tr -d '\n')" "PSW"
+T set-option -g @agent_signal_ascii on   # single-byte marks so index() measures columns, not bytes
+is "window rows share one column for the index" "$("$AS" list | awk -F'	' '$1 == "W" {print index($3, ":")}' | sort -u | wc -l | tr -d ' ')" 1
+is "a marked and an unmarked window row align" "$("$AS" list | awk -F'	' '$1 == "W" {print (substr($3, 1, 1) == " ")}' | sort -u | wc -l | tr -d ' ')" 2
+T set-option -gu @agent_signal_ascii
 T set-option -g @agent_signal_ascii on; hook "$P_API" Stop
 is "ascii preset uses + for done"    "$(wicon "$W_API")" "+"
 T set-option -gu @agent_signal_ascii
