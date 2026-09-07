@@ -169,7 +169,14 @@ paint_window() { # paint_window <window> <state-or-hold>
     return
   fi
   icon=${2%% *}; rest=${2#* }; fg=${rest%% *}; bg=${rest#* }
-  if [ "$bg" = default ] || [ "$(opt @agent_signal_tab_colour on)" != on ]; then
+  # @agent_signal_tab_colour: all (every state with a bg), needs (only when a
+  # window needs you), off (badge only). "on" is kept as an alias of all.
+  colour_tab=1
+  case $(opt @agent_signal_tab_colour all) in
+    off) colour_tab=0 ;;
+    needs) needs_you "$3" || colour_tab=0 ;;
+  esac
+  if [ "$bg" = default ] || [ "$colour_tab" = 0 ]; then
     t set-option -w -t "$1" @agent_icon "$icon" \; set-option -w -t "$1" @agent_fg "$fg"
     restore_tab "$1"
   else

@@ -186,7 +186,9 @@ set -g @agent_signal_ask     '? black colour213'
 set -g @agent_signal_done    '✓ black green'
 set -g @agent_signal_wait    '… colour245 default'
 set -g @agent_signal_park    'p colour240 default'
-set -g @agent_signal_tab_colour on        # off = badge only, never restyle the tab
+set -g @agent_signal_tab_colour all       # all: colour the tab for every state that has one
+                                          # needs: colour it only when the window needs you (blocked, ask)
+                                          # off: badge only, never restyle the tab
 set -g @agent_signal_ascii off            # on = plain ASCII defaults (+ . ?) for fonts without ✓ …
 
 # Fleet summary glyphs and colours (status-right)

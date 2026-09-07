@@ -31,4 +31,17 @@ hook "$P_WEB" SessionEnd
 is "SessionEnd clears its pane only" "$(pst "$P_WEB")" ""
 is "window keeps the other pane's state" "$(wst "$W_WEB")" done
 
+T set-option -g @agent_signal_tab_colour needs
+hook "$P_API" Stop
+is "tab colour 'needs': done shows the badge only"   "$(wstyle "$W_API")" ""
+hook "$P_API" PermissionRequest
+is "tab colour 'needs': blocked colours the tab"     "$(wstyle "$W_API")" "fg=black,bg=colour208,bold"
+T set-option -g @agent_signal_tab_colour off
+hook "$P_API" Stop; hook "$P_API" PermissionRequest
+is "tab colour 'off': never colours the tab"         "$(wstyle "$W_API")" ""
+T set-option -g @agent_signal_tab_colour on
+hook "$P_API" Stop
+is "tab colour 'on' still means all"                 "$(wstyle "$W_API")" "fg=black,bg=green,bold"
+hook "$P_API" SessionEnd; T set-option -gu @agent_signal_tab_colour
+
 finish
