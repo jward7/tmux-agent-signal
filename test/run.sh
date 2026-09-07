@@ -111,7 +111,7 @@ i=0; while [ $i -lt 10 ]; do
 done
 is "10 racing PostToolUse/PermissionRequest rounds all ended blocked" "$i" 10
 hook "$P_R1" SessionEnd; hook "$P_R2" SessionEnd; T kill-window -t "$W_RACE"
-is "no lock directories left behind" "$(ls -d "${TMPDIR:-/tmp}"/agent-signal.*.lock.* 2>/dev/null | wc -l | tr -d ' ')" 0
+is "no lock directories left behind" "$(find "${TMPDIR:-/tmp}" -maxdepth 1 -name 'agent-signal.*.lock.*' | wc -l | tr -d ' ')" 0
 
 echo "viewed -> idle"
 T select-window -t "$W_API"; waitfor "$W_API" ""
@@ -189,7 +189,7 @@ echo "summary and listing"
 hook "$P_API" UserPromptSubmit
 case $(gsum) in *"✳$(T display -p -t "$W_API" '#{window_index}')"*) ok "summary shows glyph+window index" ;; *) bad "summary" "$(gsum)" "...✳<index>..." ;; esac
 is "summary entries are space separated" "$(gsum | tr -cd ' ' | wc -c | tr -d ' ')" 2
-is "summary leaves no temp files"         "$(ls "${TMPDIR:-/tmp}"/agent-signal.[0-9]* 2>/dev/null | wc -l | tr -d ' ')" 0
+is "summary leaves no temp files"         "$(find "${TMPDIR:-/tmp}" -maxdepth 1 -name 'agent-signal.[0-9]*' | wc -l | tr -d ' ')" 0
 is "list has session, window and pane rows" "$("$AS" list | cut -f1 | sort -u | tr -d '\n')" "PSW"
 T set-option -g @agent_signal_ascii on   # single-byte marks so index() measures columns, not bytes
 is "window rows share one column for the index" "$("$AS" list | awk -F'	' '$1 == "W" {print index($3, ":")}' | sort -u | wc -l | tr -d ' ')" 1
@@ -225,7 +225,7 @@ cp "$FIX/.claude/settings.json.bak-agent-signal" "$FIX/first-backup"
 HOME=$FIX "$AS" install-claude-hooks >/dev/null
 is "re-running the installer is idempotent"      "$(jq '.hooks.Stop | length' "$FIX/.claude/settings.json")" 2
 is "re-running keeps the original backup"        "$(cmp -s "$FIX/first-backup" "$FIX/.claude/settings.json.bak-agent-signal" && echo same)" same
-is "installer leaves no temp files"              "$(ls "$FIX/.claude/" | grep -c 'settings.json\.[A-Za-z0-9]\{6\}$')" 0
+is "installer leaves no temp files"              "$(find "$FIX/.claude" -name 'settings.json.??????' | wc -l | tr -d ' ')" 0
 rm -rf "$FIX"
 
 echo "clear"
@@ -245,8 +245,8 @@ is "reloading rebinds our own key without complaint" "$(T list-keys -T prefix | 
 echo "usage"
 is "help exits 0 and prints the usage block"  "$("$AS" help | grep -c 'agent-signal hook'; echo "rc=$?")" "1
 rc=0"
-is "version prints the version"               "$(TMUX= "$AS" version)" "0.2.0"
-is "help works outside tmux"                  "$(TMUX= "$AS" --help | grep -c Usage)" 1
+is "version prints the version"               "$(TMUX='' "$AS" version)" "0.2.0"
+is "help works outside tmux"                  "$(TMUX='' "$AS" --help | grep -c Usage)" 1
 is "unknown command exits 1 with a message"   "$("$AS" bogus 2>&1 >/dev/null | head -1)" "agent-signal: unknown command 'bogus'"
 is "hold without a mode explains itself"      "$("$AS" hold 2>&1 | head -1)" "agent-signal hold: wait, park or clear"
 

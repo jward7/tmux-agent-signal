@@ -1,5 +1,5 @@
 #!/bin/sh
-# shellcheck disable=SC2209  # state words as arguments
+# shellcheck disable=SC1010,SC2209  # state words as arguments
 # Build a throwaway tmux server showing every state, for screenshots and tyre kicking.
 #
 #   sh docs/demo.sh            create it (server name: demo)
