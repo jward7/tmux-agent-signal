@@ -162,6 +162,9 @@ hook "$P_WEB2" PermissionRequest; T select-window -t "$W_API"
 is "next finds a blocked window in a session whose name has a space" "$(T display -p '#{window_id}')" "$W_WEB"
 hook "$P_WEB2" Stop; T select-window -t "$W_API"; sleep 0.3
 T rename-session -t 'my proj' main
+T rename-window -t "$W_WEB" ''
+is "list survives an empty window name" "$("$AS" list 2>&1 | grep -c 'integer expression')" 0
+T rename-window -t "$W_WEB" web
 
 echo "summary and listing"
 hook "$P_API" UserPromptSubmit
