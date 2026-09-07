@@ -318,32 +318,34 @@ tmux, turn on `@agent_signal_bell` and let your terminal handle the bell, or
 ## How it compares
 
 All of these are good projects under active development, so this is a
-snapshot as of **2026-09-07**. 🟢 has it, 🟡 partial or optional, 🔴 does not,
+snapshot as of **2026-09-07**. tmux-agent-state is the closest relative:
+the same hook-driven, no-daemon design, with more agent integrations and
+without the triage, switcher and summary layers. 🟢 has it, 🟡 partial or optional, 🔴 does not,
 ▫️ not applicable. Corrections welcome.
 
-| | tmux-agent-signal | [samleeney/tmux-agent-status](https://github.com/samleeney/tmux-agent-status) | [gentle-agent-state](https://github.com/Gentleman-Programming/gentle-agent-state) | [RatulMaharaj/tmux-agent-status](https://github.com/RatulMaharaj/tmux-agent-status) | [herdr](https://github.com/herdrdev/herdr) |
-|---|---|---|---|---|---|
-| Stays inside tmux | 🟢 | 🟢 | 🟢 also Zellij, Ghostty | 🟢 | 🔴 replaces tmux |
-| State source | 🟢 hooks | 🟢 hooks | 🟢 hooks | 🔴 polls `ps` and screen text | 🟡 hooks for some agents, screen heuristics for Claude and Codex |
-| No daemon or polling | 🟢 | 🔴 collector daemon | 🟢 | 🔴 3 s poller | ▫️ is the server |
-| Works with no hooks installed | 🔴 | 🔴 | 🔴 | 🟢 | 🟢 |
-| Per-window badge | 🟢 | 🟢 | 🟢 | 🟢 | ▫️ sidebar |
-| Tab colour per state | 🟢 | 🔴 | 🔴 marker only | 🟢 | ▫️ |
-| Question vs permission distinguished | 🟢 | 🟡 in an open PR | 🔴 | 🔴 | 🟢 |
-| Done clears when viewed | 🟢 | 🟢 | 🔴 | 🟢 | 🟢 |
-| Jump to next needing you | 🟢 | 🟢 | 🔴 | 🔴 | 🟢 |
-| Wait / park triage | 🟢 | 🟢 | 🔴 | 🔴 | 🔴 |
-| Switcher with close actions | 🟢 fzf popup | 🟢 sidebar + popup | 🔴 | 🔴 | 🟢 |
-| Fleet summary in status bar | 🟢 | 🟢 | 🔴 | 🟡 badges only | 🟢 |
-| Sounds | 🟢 | 🟢 | 🟢 | 🟢 | 🟢 |
-| Background task awareness | 🟢 | 🟢 | 🔴 | 🔴 | ▫️ |
-| Claude Code | 🟢 | 🟢 | 🟢 | 🟢 | 🟢 |
-| Codex CLI | 🟡 generic entry, untested | 🟢 | 🟢 | 🟡 presence only | 🟢 |
-| Pi / OpenCode | 🟡 generic entry, untested | 🔴 / 🔴 | 🟢 / 🟢 | 🔴 | 🟢 |
-| Agent-to-agent API | 🔴 | 🔴 | 🔴 | 🔴 | 🟢 socket API |
-| Survives lid close / restart without resume | 🔴 use resurrect | 🔴 | 🔴 | 🔴 | 🟢 |
-| Tests in repo | 🟢 | 🟢 | 🟢 | 🔴 | 🟢 |
-| Licence | MIT | none stated | MIT | MIT | Apache-2.0 |
+| | tmux-agent-signal | [tmux-agent-state](https://github.com/cburmeister/tmux-agent-state) | [samleeney/tmux-agent-status](https://github.com/samleeney/tmux-agent-status) | [gentle-agent-state](https://github.com/Gentleman-Programming/gentle-agent-state) | [RatulMaharaj/tmux-agent-status](https://github.com/RatulMaharaj/tmux-agent-status) | [herdr](https://github.com/herdrdev/herdr) |
+|---|---|---|---|---|---|---|
+| Stays inside tmux | 🟢 | 🟢 | 🟢 | 🟢 also Zellij, Ghostty | 🟢 | 🔴 replaces tmux |
+| State source | 🟢 hooks | 🟢 hooks | 🟢 hooks | 🟢 hooks | 🔴 polls `ps` and screen text | 🟡 hooks for some agents, screen heuristics for Claude and Codex |
+| No daemon or polling | 🟢 | 🟢 | 🔴 collector daemon | 🟢 | 🔴 3 s poller | ▫️ is the server |
+| Works with no hooks installed | 🔴 | 🔴 | 🔴 | 🔴 | 🟢 | 🟢 |
+| Per-window badge | 🟢 | 🟢 | 🟢 | 🟢 | 🟢 | ▫️ sidebar |
+| Tab colour per state | 🟢 | 🟢 | 🔴 | 🔴 marker only | 🟢 | ▫️ |
+| Question vs permission distinguished | 🟢 | 🔴 | 🟡 in an open PR | 🔴 | 🔴 | 🟢 |
+| Done clears when viewed | 🟢 | 🟢 | 🟢 | 🔴 | 🟢 | 🟢 |
+| Jump to next needing you | 🟢 | 🟢 | 🟢 | 🔴 | 🔴 | 🟢 |
+| Wait / park triage | 🟢 | 🔴 | 🟢 | 🔴 | 🔴 | 🔴 |
+| Switcher with close actions | 🟢 fzf popup | 🔴 | 🟢 sidebar + popup | 🔴 | 🔴 | 🟢 |
+| Fleet summary in status bar | 🟢 | 🔴 | 🟢 | 🔴 | 🟡 badges only | 🟢 |
+| Sounds | 🟢 | 🟡 bell; bring your own notifier | 🟢 | 🟢 | 🟢 | 🟢 |
+| Background task awareness | 🟢 | 🔴 | 🟢 | 🔴 | 🔴 | ▫️ |
+| Claude Code | 🟢 plugin or hooks | 🟢 plugin install | 🟢 | 🟢 | 🟢 | 🟢 |
+| Codex CLI | 🟡 done only, from docs | 🟡 done only | 🟢 | 🟢 | 🟡 presence only | 🟢 |
+| Pi / OpenCode | 🟡 from docs / 🟡 from docs | 🟢 / 🟢 | 🔴 / 🔴 | 🟢 / 🟢 | 🔴 | 🟢 |
+| Agent-to-agent API | 🔴 | 🔴 | 🔴 | 🔴 | 🔴 | 🟢 socket API |
+| Survives lid close / restart without resume | 🔴 use resurrect | 🔴 | 🔴 | 🔴 | 🔴 | 🟢 |
+| Tests in repo | 🟢 | 🟢 | 🟢 | 🟢 | 🔴 | 🟢 |
+| Licence | MIT | MIT | none stated | MIT | MIT | Apache-2.0 |
 
 If you want detection with nothing installed in the agent, or agents that talk
 to each other, herdr is the right tool and this plugin is not trying to be it.

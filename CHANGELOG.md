@@ -1,5 +1,26 @@
 # Changelog
 
+## 0.3.0 (2026-09-07)
+
+- Installable as a Claude Code plugin: `/plugin marketplace add
+  jward7/tmux-agent-signal`, then `/plugin install tmux-agent-signal@jward7`.
+- The script's path is published as `@agent_signal_command`, so other
+  agents' hook files never hard-code a plugin directory.
+- A hook that fires before tmux has sourced the entry file wires the server
+  up itself instead of being dropped.
+- `check` subcommand: reports what is wired, what is missing, which windows
+  carry an unmended format override, and which optional tools are present.
+- `@agent_signal_alert_command`: run your own command on a state transition,
+  with tmux formats expanded and the state in the environment.
+- A per-window `window-status-format` set by a theme gets the badge woven in
+  on that window's next event.
+- `@agent_signal_tab_colour` gains `needs` (colour the tab only when the
+  window needs you) alongside `all` and `off`.
+- Integrations for Codex CLI, Gemini CLI, Copilot CLI, OpenCode and Pi,
+  written from the vendors' docs.
+- Plan approval no longer reports twice: only AskUserQuestion maps to ask,
+  since ExitPlanMode arrives as a PermissionRequest.
+
 ## 0.2.1 (2026-09-07)
 
 - The per-window lock is keyed on the tmux server socket as well as the

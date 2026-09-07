@@ -1,6 +1,6 @@
 #!/bin/sh
 # shellcheck disable=SC1010,SC2209  # done, "wait", "park" are state words here, not keywords
-# agent-signal 0.2.1: per-window AI coding-agent state in the tmux status bar.
+# agent-signal 0.3.0: per-window AI coding-agent state in the tmux status bar.
 #
 # State lives in tmux user options, written by agent hooks and read natively
 # by the status line. No daemon, no polling, nothing runs on redraw.
