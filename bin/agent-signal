@@ -272,7 +272,10 @@ sync_registry() {
     jq -r 'select(.tmux != null and .tmux != "") | "\(.tmux)\t\(.name // "-")"' "$f" 2>/dev/null \
     | { IFS='	' read -r tm name || exit 0
         pane="%${tm##*.%}"
-        t display -p -t "$pane" '' >/dev/null 2>&1 || exit 0
+        # The registry names session:window.pane; require all three to match so a
+        # stale entry, or another server reusing the same pane number, is ignored.
+        loc=$(t display -p -t "$pane" '#{session_name}:#{window_id}.#{pane_id}' 2>/dev/null) || exit 0
+        [ "$loc" = "$tm" ] || exit 0
         [ -n "$name" ] && [ "$name" != - ] && t set-option -p -t "$pane" @agent_name "$name"
         t set-option -p -t "$pane" @agent_kind claude; }
   done

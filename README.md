@@ -4,10 +4,12 @@ See which tmux window has an AI coding agent that is **working**, **blocked on
 you**, or **done**, straight from the window list in your status bar. Jump to
 the next one that needs you with a key. No sidebar, no daemon, no polling.
 
-```
-1:trade  2:anomaly !  3:geophysics ✓  4:ModMag ~  5:Harbour  6:VLF …
-                   ^ orange tab       ^ green tab   ^ yellow ~    ^ waiting
-```
+![status bar with agent badges](docs/demo.png)
+
+Left: how many windows need you, and the Claude session in the active pane.
+Middle: `2:web` is blocked on a permission (orange), `3:docs` finished while
+you were elsewhere (green), `4:infra` is asking a question (pink), `1:api` and
+`5:data` are working (`~`). Right: one glyph per agent with its window number.
 
 State is written by the agent's own lifecycle hooks into tmux user options and
 read natively by the status line. Nothing runs on redraw. Claude Code is wired
@@ -249,6 +251,41 @@ run -b '~/.tmux/plugins/tpm/tpm'
 tmux, turn on `@agent_signal_bell` and let your terminal handle the bell, or
 `@agent_signal_notify` with an OSC-aware terminal and `allow-passthrough`.
 
+## How it compares
+
+All of these are good projects under active development, so this is a
+snapshot as of **2026-09-07**. 🟢 has it, 🟡 partial or optional, 🔴 does not,
+▫️ not applicable. Corrections welcome.
+
+| | tmux-agent-signal | [samleeney/tmux-agent-status](https://github.com/samleeney/tmux-agent-status) | [gentle-agent-state](https://github.com/Gentleman-Programming/gentle-agent-state) | [RatulMaharaj/tmux-agent-status](https://github.com/RatulMaharaj/tmux-agent-status) | [herdr](https://github.com/herdrdev/herdr) |
+|---|---|---|---|---|---|
+| Stays inside tmux | 🟢 | 🟢 | 🟢 also Zellij, Ghostty | 🟢 | 🔴 replaces tmux |
+| State source | 🟢 hooks | 🟢 hooks | 🟢 hooks | 🔴 polls `ps` and screen text | 🟡 hooks for some agents, screen heuristics for Claude and Codex |
+| No daemon or polling | 🟢 | 🔴 collector daemon | 🟢 | 🔴 3 s poller | ▫️ is the server |
+| Works with no hooks installed | 🔴 | 🔴 | 🔴 | 🟢 | 🟢 |
+| Per-window badge | 🟢 | 🟢 | 🟢 | 🟢 | ▫️ sidebar |
+| Tab colour per state | 🟢 | 🔴 | 🔴 marker only | 🟢 | ▫️ |
+| Question vs permission distinguished | 🟢 | 🟡 in an open PR | 🔴 | 🔴 | 🟢 |
+| Done clears when viewed | 🟢 | 🟢 | 🔴 | 🟢 | 🟢 |
+| Jump to next needing you | 🟢 | 🟢 | 🔴 | 🔴 | 🟢 |
+| Wait / park triage | 🟢 | 🟢 | 🔴 | 🔴 | 🔴 |
+| Switcher with close actions | 🟢 fzf popup | 🟢 sidebar + popup | 🔴 | 🔴 | 🟢 |
+| Fleet summary in status bar | 🟢 | 🟢 | 🔴 | 🟡 badges only | 🟢 |
+| Sounds | 🟢 | 🟢 | 🟢 | 🟢 | 🟢 |
+| Background task awareness | 🟢 | 🟢 | 🔴 | 🔴 | ▫️ |
+| Claude Code | 🟢 | 🟢 | 🟢 | 🟢 | 🟢 |
+| Codex CLI | 🟡 generic entry, untested | 🟢 | 🟢 | 🟡 presence only | 🟢 |
+| Pi / OpenCode | 🟡 generic entry, untested | 🔴 / 🔴 | 🟢 / 🟢 | 🔴 | 🟢 |
+| Agent-to-agent API | 🔴 | 🔴 | 🔴 | 🔴 | 🟢 socket API |
+| Survives lid close / restart without resume | 🔴 use resurrect | 🔴 | 🔴 | 🔴 | 🟢 |
+| Tests in repo | 🟢 | 🟢 | 🟢 | 🔴 | 🟢 |
+| Licence | MIT | none stated | MIT | MIT | Apache-2.0 |
+
+If you want detection with nothing installed in the agent, or agents that talk
+to each other, herdr is the right tool and this plugin is not trying to be it.
+If you want to stay in your tmux setup with hooks doing the work, this plugin
+is the smallest option that still covers triage and navigation.
+
 ## How it works
 
 ```
@@ -269,6 +306,16 @@ in tmux formats and would otherwise read back the aggregate.
 (`~/.claude/sessions/*.json`, which records each session's tmux pane and
 display name) to label panes. It runs on `SessionStart`, when the plugin
 loads, and when the switcher opens.
+
+## Development
+
+```sh
+sh test/run.sh        # end-to-end tests on an isolated tmux server (-L agent-signal-test)
+shellcheck -s sh bin/agent-signal scripts/switcher.sh agent-signal.tmux test/run.sh
+sh docs/demo.sh       # throwaway server showing every state; tmux -L demo attach
+```
+
+CI runs both on Ubuntu and macOS.
 
 ## Troubleshooting
 
