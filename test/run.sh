@@ -110,6 +110,10 @@ is "no lock directories left behind" "$(ls -d "${TMPDIR:-/tmp}"/agent-signal.*.l
 echo "viewed -> idle"
 T select-window -t "$W_API"; sleep 0.5
 is "viewing a done window clears it (after-select-window hook)" "$(wst "$W_API")" ""
+is "all three seen hooks name their own window" "$(T show-hooks -g | grep -c 'seen #{window_id}')" 3
+hook "$P_WEB" Stop
+"$AS" seen "$W_WEB"
+is "seen with an explicit window clears that window" "$(wst "$W_WEB")" ""
 hook "$P_API" UserPromptSubmit; hook "$P_API" Stop
 # No client is attached to the test server, so nobody is "looking": done must show.
 is "finishing in the active window of a detached session still shows done" "$(wst "$W_API")" "done"

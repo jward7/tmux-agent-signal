@@ -18,7 +18,7 @@
 #   agent-signal hook <ClaudeHookEvent>        Claude Code hook entry (JSON on stdin)
 #   agent-signal set <state> [pane]            generic entry for any agent
 #   agent-signal clear [pane]                  agent exited
-#   agent-signal seen                          current window viewed: done -> idle
+#   agent-signal seen [window]                 window viewed: done -> idle (default: current)
 #   agent-signal next                          jump to next blocked, else next done
 #   agent-signal hold wait|park|clear          triage the current window
 #   agent-signal list                          tree of sessions/windows/panes (for the switcher)
@@ -318,8 +318,8 @@ sync_registry() {
 # --- navigation & triage ---------------------------------------------------
 current_window() { t display -p '#{window_id}'; }
 
-seen() {
-  win=$(current_window)
+seen() { # seen [window]: the hook passes its own window so a second attached client is never confused
+  win=${1:-$(current_window)}
   [ "$(t show-option -wqv -t "$win" @agent_state)" = "done" ] || return 0
   lock_window "$win"
   clear_done_panes "$win"
@@ -404,7 +404,7 @@ case ${1:-} in
   hook)   hook "${2:?event}" ;;
   set)    set_state "${2:?state}" "${3:-}" ;;
   clear)  set_state clear "${2:-}" ;;
-  seen)   seen ;;
+  seen)   seen "${2:-}" ;;
   summary) refresh_summary ;;
   next)   next ;;
   hold)   hold "${2:?wait|park|clear}" "${3:-}" ;;
