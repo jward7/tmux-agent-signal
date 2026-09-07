@@ -1,0 +1,318 @@
+#!/bin/sh
+# agent-signal: per-window AI coding-agent state in the tmux status bar.
+#
+# State lives in tmux user options, written by agent hooks and read natively
+# by the status line. No daemon, no polling, nothing runs on redraw.
+#
+#   pane   @agent_state   working | blocked | done   (unset = idle / no agent)
+#   pane   @agent_kind    claude | codex | pi | ...   (who reported)
+#   pane   @agent_name    display name (from Claude's session registry)
+#   window @agent_state   aggregate of its panes: blocked > done > working
+#   window @agent_hold    wait | park                (user triage override)
+#   window @agent_icon / @agent_fg / @agent_bg       what the status bar draws
+#
+# Usage:
+#   agent-signal hook <ClaudeHookEvent>        Claude Code hook entry (JSON on stdin)
+#   agent-signal set <state> [pane]            generic entry for any agent
+#   agent-signal clear [pane]                  agent exited
+#   agent-signal seen                          current window viewed: done -> idle
+#   agent-signal next                          jump to next blocked, else next done
+#   agent-signal hold wait|park|clear          triage the current window
+#   agent-signal list                          tree of sessions/windows/panes (for the switcher)
+#   agent-signal sync                          pull names/presence from ~/.claude/sessions
+#   agent-signal install-claude-hooks          merge hooks into ~/.claude/settings.json (needs jq)
+set -u
+
+PLUGIN_DIR=$(cd "$(dirname "$0")/.." && pwd)
+SELF="$PLUGIN_DIR/bin/agent-signal"
+
+# --- tmux binary -----------------------------------------------------------
+# Hooks run with whatever PATH the agent had. Homebrew also unlinks tmux while
+# it builds an upgrade, so fall back to known install locations.
+if command -v tmux >/dev/null 2>&1; then
+  TMUX_BIN=tmux
+else
+  TMUX_BIN=""
+  for c in /opt/homebrew/bin/tmux /usr/local/bin/tmux /usr/bin/tmux /opt/homebrew/Cellar/tmux/*/bin/tmux /usr/local/Cellar/tmux/*/bin/tmux; do
+    [ -x "$c" ] && TMUX_BIN=$c && break
+  done
+  [ -n "$TMUX_BIN" ] || exit 0
+fi
+t() { "$TMUX_BIN" "$@"; }
+
+[ -n "${TMUX:-}" ] || [ "${1:-}" = install-claude-hooks ] || exit 0
+
+# --- options ---------------------------------------------------------------
+opt() { # opt <name> <default>
+  v=$(t show-option -gqv "$1" 2>/dev/null)
+  [ -n "$v" ] && printf '%s' "$v" || printf '%s' "$2"
+}
+
+# --- helpers ---------------------------------------------------------------
+json_get() { # json_get <jq-filter> <sed-key-fallback>
+  if command -v jq >/dev/null 2>&1; then
+    printf '%s' "$JSON" | jq -r "$1 // empty" 2>/dev/null
+  else
+    printf '%s' "$JSON" | sed -n "s/.*\"$2\":\"\([^\"]*\)\".*/\1/p" | head -1
+  fi
+}
+
+resolve_pane() { # resolve_pane [pane] -> echoes pane id
+  p=${1:-${TMUX_PANE:-}}
+  [ -n "$p" ] || p=$(t display -p '#{pane_id}')
+  printf '%s' "$p"
+}
+
+window_of() { t display -p -t "$1" '#{window_id}'; }
+
+# Pane options inherit from the window in formats, so read them directly.
+pane_state() { t show-option -pqv -t "$1" @agent_state 2>/dev/null; }
+pane_opt()   { t show-option -pqv -t "$1" "$2" 2>/dev/null; }
+
+visible() { # visible <window> -> 0 if that window is on screen in an attached client
+  [ "$(t display -p -t "$1" '#{window_active}#{?session_attached,1,0}')" = "11" ]
+}
+
+play() { # play <state>
+  [ "$(opt @agent_signal_sound on)" = on ] || return 0
+  case $1 in
+    blocked) s=$(opt @agent_signal_sound_blocked Ping) ;;
+    done)    s=$(opt @agent_signal_sound_done Glass) ;;
+    *) return 0 ;;
+  esac
+  [ "$s" = off ] && return 0
+  if [ -x /usr/bin/afplay ]; then
+    f=$s; [ -f "$f" ] || f="/System/Library/Sounds/$s.aiff"
+    (/usr/bin/afplay "$f" >/dev/null 2>&1 &)
+  elif command -v paplay >/dev/null 2>&1; then
+    (paplay "$s" >/dev/null 2>&1 &)
+  fi
+}
+
+notify() { # notify <state> <window>
+  [ "$(opt @agent_signal_notify off)" = on ] || return 0
+  title="Agent $1"
+  body=$(t display -p -t "$2" '#{session_name}:#{window_index} #{window_name}')
+  if command -v terminal-notifier >/dev/null 2>&1; then
+    (terminal-notifier -title "$title" -message "$body" >/dev/null 2>&1 &)
+  elif command -v osascript >/dev/null 2>&1; then
+    (osascript -e "display notification \"$body\" with title \"$title\"" >/dev/null 2>&1 &)
+  elif command -v notify-send >/dev/null 2>&1; then
+    (notify-send "$title" "$body" >/dev/null 2>&1 &)
+  fi
+}
+
+bell() { # bell <pane>: ring tmux's own bell in that pane (monitor-bell, SSH-safe)
+  [ "$(opt @agent_signal_bell off)" = on ] || return 0
+  tty=$(t display -p -t "$1" '#{pane_tty}')
+  [ -w "$tty" ] && printf '\a' > "$tty"
+}
+
+# --- state -----------------------------------------------------------------
+style_for() { # style_for <state|hold> -> "icon fg bg"
+  case $1 in
+    working) printf '%s' "$(opt @agent_signal_working "~ yellow default")" ;;
+    blocked) printf '%s' "$(opt @agent_signal_blocked "! black colour208")" ;;
+    done)    printf '%s' "$(opt @agent_signal_done "✓ black green")" ;;
+    wait)    printf '%s' "$(opt @agent_signal_wait "… colour245 default")" ;;
+    park)    printf '%s' "$(opt @agent_signal_park "p colour240 default")" ;;
+    *)       printf '' ;;
+  esac
+}
+
+paint_window() { # paint_window <window> <state-or-hold>
+  set -- "$1" "$(style_for "$2")"
+  if [ -z "$2" ]; then
+    t set-option -uw -t "$1" @agent_icon
+    t set-option -uw -t "$1" @agent_fg
+    t set-option -uw -t "$1" window-status-style
+    return
+  fi
+  icon=${2%% *}; rest=${2#* }; fg=${rest%% *}; bg=${rest#* }
+  t set-option -w -t "$1" @agent_icon "$icon"
+  t set-option -w -t "$1" @agent_fg "$fg"
+  if [ "$bg" = default ] || [ "$(opt @agent_signal_tab_colour on)" != on ]; then
+    t set-option -uw -t "$1" window-status-style
+  else
+    t set-option -w -t "$1" window-status-style "fg=$fg,bg=$bg,bold"
+  fi
+}
+
+refresh_window() { # refresh_window <window> [event]
+  win=$1; ev=${2:-}
+  prev=$(t show-option -wqv -t "$win" @agent_state)
+  hold=$(t show-option -wqv -t "$win" @agent_hold)
+  agg=""
+  for p in $(t list-panes -t "$win" -F '#{pane_id}'); do
+    case $(pane_state "$p") in
+      blocked) agg=blocked ;;
+      done)    [ "$agg" != blocked ] && agg=done ;;
+      working) [ -z "$agg" ] && agg=working ;;
+    esac
+  done
+
+  # Something new happened -> a "wait" hold has served its purpose.
+  if [ "$hold" = wait ] && [ -n "$ev" ] && [ "$agg" != "$prev" ]; then
+    hold=""; t set-option -uw -t "$win" @agent_hold
+  fi
+
+  # Finished while you were already looking at it -> nothing to flag.
+  if [ "$agg" = done ] && [ -n "$ev" ] && visible "$win"; then
+    for p in $(t list-panes -t "$win" -F '#{pane_id}'); do
+      [ "$(pane_state "$p")" = done ] && t set-option -up -t "$p" @agent_state
+    done
+    agg=""
+  fi
+
+  if [ -n "$agg" ]; then t set-option -w -t "$win" @agent_state "$agg"; else t set-option -uw -t "$win" @agent_state; fi
+
+  if [ -n "$hold" ] && [ "$agg" != blocked ]; then paint_window "$win" "$hold"; else paint_window "$win" "$agg"; fi
+
+  if [ -n "$ev" ] && [ "$agg" != "$prev" ] && [ -z "$hold" ]; then
+    case $agg in blocked|done) visible "$win" || { play "$agg"; notify "$agg" "$win"; } ;; esac
+  fi
+}
+
+set_state() { # set_state <state> [pane]
+  pane=$(resolve_pane "${2:-}")
+  win=$(window_of "$pane") || exit 0
+  case $1 in
+    working|blocked|done) t set-option -p -t "$pane" @agent_state "$1" ;;
+    idle|clear|"")        t set-option -up -t "$pane" @agent_state ;;
+    *) echo "agent-signal: unknown state '$1'" >&2; exit 1 ;;
+  esac
+  [ "$1" = clear ] && { t set-option -up -t "$pane" @agent_kind; t set-option -up -t "$pane" @agent_name; } \
+                   || t set-option -p -t "$pane" @agent_kind "${AGENT_KIND:-agent}"
+  [ "$1" = blocked ] && bell "$pane"
+  refresh_window "$win" event
+}
+
+# --- Claude Code hook mapping ---------------------------------------------
+hook() {
+  JSON=$(cat 2>/dev/null || true)
+  AGENT_KIND=claude
+  case $1 in
+    SessionStart)      set_state idle; sync_registry ;;
+    UserPromptSubmit|PreToolUse|PostToolUse) set_state working ;;
+    PermissionRequest) set_state blocked ;;
+    Notification)
+      case $(json_get '.notification_type' notification_type) in
+        permission_prompt|elicitation*|agent_needs_input) set_state blocked ;;
+        idle_prompt) set_state done ;;   # turn ended without a Stop (e.g. Esc)
+      esac ;;
+    Stop|StopFailure)
+      n=$(json_get '(.background_tasks // []) | length' background_tasks)
+      case $n in ''|0) set_state done ;; *) set_state working ;; esac ;;
+    SessionEnd)        set_state clear ;;
+  esac
+}
+
+# --- Claude session registry (names, presence) -----------------------------
+sync_registry() {
+  dir="$HOME/.claude/sessions"; [ -d "$dir" ] || return 0
+  command -v jq >/dev/null 2>&1 || return 0
+  for f in "$dir"/*.json; do
+    [ -f "$f" ] || continue
+    jq -r 'select(.tmux != null and .tmux != "") | "\(.tmux)\t\(.name // "-")"' "$f" 2>/dev/null \
+    | { IFS='	' read -r tm name || exit 0
+        pane="%${tm##*.%}"
+        t display -p -t "$pane" '' >/dev/null 2>&1 || exit 0
+        [ -n "$name" ] && [ "$name" != - ] && t set-option -p -t "$pane" @agent_name "$name"
+        t set-option -p -t "$pane" @agent_kind claude; }
+  done
+}
+
+# --- navigation & triage ---------------------------------------------------
+current_window() { t display -p '#{window_id}'; }
+
+seen() {
+  win=$(current_window)
+  [ "$(t show-option -wqv -t "$win" @agent_state)" = done ] || return 0
+  for p in $(t list-panes -t "$win" -F '#{pane_id}'); do
+    [ "$(pane_state "$p")" = done ] && t set-option -up -t "$p" @agent_state
+  done
+  refresh_window "$win"
+}
+
+next() {
+  cur=$(current_window)
+  list=$(t list-windows -a -F '#{window_id} #{session_name} #{@agent_state} #{@agent_hold}')
+  # rotate so we scan the windows after the current one first
+  after=$(printf '%s\n' "$list" | sed -n "/^$cur /,\$p" | sed '1d')
+  before=$(printf '%s\n' "$list" | sed "/^$cur /,\$d")
+  ordered=$(printf '%s\n%s\n' "$after" "$before")
+  for want in blocked done; do
+    target=$(printf '%s\n' "$ordered" | awk -v w="$want" '$3==w && $4=="" {print $1" "$2; exit}')
+    if [ -n "$target" ]; then
+      t switch-client -t "${target#* }" 2>/dev/null
+      t select-window -t "${target%% *}"
+      return 0
+    fi
+  done
+  t display-message "agent-signal: nothing needs you"
+}
+
+hold() { # hold wait|park|clear [window]
+  win=${2:-$(current_window)}
+  cur=$(t show-option -wqv -t "$win" @agent_hold)
+  case $1 in
+    clear) t set-option -uw -t "$win" @agent_hold ;;
+    wait|park)
+      if [ "$cur" = "$1" ]; then t set-option -uw -t "$win" @agent_hold
+      else t set-option -w -t "$win" @agent_hold "$1"; fi ;;
+  esac
+  refresh_window "$win"
+}
+
+# --- listing for the switcher ---------------------------------------------
+# kind<TAB>target<TAB>display
+list() {
+  sync_registry
+  t list-sessions -F '#{session_name}' | while read -r s; do
+    sstate=$(t list-windows -t "$s" -F '#{@agent_state}' | awk '/blocked/{b=1} /done/{d=1} /working/{w=1} END{if(b)print "!";else if(d)print "✓";else if(w)print "~"}')
+    printf 'S\t%s\t%-2s %s\n' "$s" "$sstate" "$s"
+    # tab-separated; empty fields are sent as "-" because `read` collapses runs of tabs
+    t list-windows -t "$s" -F '#{window_id}	#{window_index}	#{window_name}	#{?@agent_state,#{@agent_state},-}	#{?@agent_hold,#{@agent_hold},-}	#{window_panes}' \
+    | while IFS='	' read -r wid idx name st hd np; do
+        [ "$st" = - ] && st=""; [ "$hd" = - ] && hd=""
+        mark=$(style_for "${hd:-$st}"); mark=${mark%% *}
+        printf 'W\t%s\t%-2s   %s:%s%s\n' "$wid" "${mark:-}" "$idx" "$name" "${hd:+ ($hd)}"
+        [ "$np" -gt 1 ] || [ -n "$st" ] || continue
+        t list-panes -t "$wid" -F '#{pane_id}	#{pane_index}	#{?pane_current_command,#{pane_current_command},-}' \
+        | while IFS='	' read -r pid pidx pc; do
+            pst=$(pane_state "$pid"); pk=$(pane_opt "$pid" @agent_kind); pn=$(pane_opt "$pid" @agent_name)
+            m=$(style_for "$pst"); m=${m%% *}
+            printf 'P\t%s\t%-2s      %s: %s\n' "$pid" "${m:-}" "$pidx" "${pn:-${pk:-$pc}}"
+          done
+      done
+  done
+}
+
+# --- installer -------------------------------------------------------------
+install_claude_hooks() {
+  settings="$HOME/.claude/settings.json"
+  command -v jq >/dev/null 2>&1 || { echo "jq is required to merge hooks; see docs/claude-hooks.json for a manual copy" >&2; exit 1; }
+  [ -f "$settings" ] || printf '{}\n' > "$settings"
+  cp "$settings" "$settings.bak-agent-signal"
+  tmp=$(mktemp) || exit 1
+  jq --arg bin "$SELF" '
+    def entry($ev): {matcher: "", hooks: [{type: "command", command: ($bin + " hook " + $ev), async: true}]};
+    def add($ev): .hooks[$ev] = ((.hooks[$ev] // []) | map(select((.hooks // []) | any(.command | tostring | contains("agent-signal hook")) | not)) + [entry($ev)]);
+    .hooks //= {} |
+    reduce ("SessionStart","UserPromptSubmit","PreToolUse","PostToolUse","PermissionRequest","Notification","Stop","SessionEnd") as $ev (.; add($ev))
+  ' "$settings" > "$tmp" && mv "$tmp" "$settings" && echo "hooks merged into $settings (backup: $settings.bak-agent-signal)"
+}
+
+# --- dispatch --------------------------------------------------------------
+case ${1:-} in
+  hook)   hook "${2:?event}" ;;
+  set)    set_state "${2:?state}" "${3:-}" ;;
+  clear)  set_state clear "${2:-}" ;;
+  seen)   seen ;;
+  next)   next ;;
+  hold)   hold "${2:?wait|park|clear}" "${3:-}" ;;
+  list)   list ;;
+  sync)   sync_registry ;;
+  install-claude-hooks) install_claude_hooks ;;
+  *) sed -n '2,20p' "$0"; exit 1 ;;
+esac
