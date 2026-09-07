@@ -1,4 +1,5 @@
 #!/bin/sh
+# shellcheck disable=SC2209  # state words as arguments
 # Build a throwaway tmux server showing every state, for screenshots and tyre kicking.
 #
 #   sh docs/demo.sh            create it (server name: demo)
@@ -26,7 +27,9 @@ D set -g status-right "#{?client_prefix,#[reverse]<Prefix>#[noreverse], } #[fg=g
 D set -g status-left "#{?@agent_needs,#[fg=black#,bg=colour208#,bold] #{@agent_needs} need you #[default],#[fg=colour245] clear #[default]} #[fg=cyan]#{@agent_name}#[default]"
 D set -g @agent_signal_sound off
 
-export TMUX="$TMUX_TMPDIR/tmux-$(id -u)/demo,0,0"   # point the plugin at this server
+# The plugin scripts exit early unless $TMUX is set, and use it to find the
+# server, so fabricate the value tmux would export inside a pane of this one.
+TMUX="$TMUX_TMPDIR/tmux-$(id -u)/demo,0,0"; export TMUX
 sh "$ROOT/agent-signal.tmux"
 
 pane() { D list-panes -t "$1" -F '#{pane_id}' | head -1; }
