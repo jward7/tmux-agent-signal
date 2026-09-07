@@ -101,7 +101,7 @@ a running session, or start a new one, so Claude reloads its config.
 |-----------------------------------------------|---------|
 | `SessionStart`                                | idle, and pull the session name from Claude's registry |
 | `UserPromptSubmit`, `PreToolUse`, `PostToolUse` | working |
-| `PreToolUse` for AskUserQuestion or ExitPlanMode | ask |
+| `PreToolUse` for AskUserQuestion              | ask (plan approval is not mapped here: it arrives as a `PermissionRequest`) |
 | `PermissionRequest`, `Notification` permission_prompt | blocked |
 | `Notification` elicitation, agent_needs_input | ask |
 | `Notification` idle_prompt                    | done, but only if the pane is still marked working (a turn ended with Esc skips `Stop`). Otherwise ignored, since this fires a minute after every finish |

@@ -20,6 +20,8 @@ is "PreToolUse AskUserQuestion -> ask" "$(wst "$W_API")" ask
 is "ask counts as needing you"       "$(gneeds)" 1
 hook "$P_API" PostToolUse '{"tool_name":"AskUserQuestion"}'
 is "PostToolUse -> working"          "$(wst "$W_API")" working
+hook "$P_API" PreToolUse '{"tool_name":"ExitPlanMode"}'
+is "PreToolUse ExitPlanMode stays working (its PermissionRequest flags it)" "$(wst "$W_API")" working
 hook "$P_API" PermissionRequest
 is "PermissionRequest -> blocked"    "$(wst "$W_API")" blocked
 is "blocked colours the tab"         "$(wstyle "$W_API")" "fg=black,bg=colour208,bold"

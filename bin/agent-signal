@@ -298,7 +298,10 @@ hook() {
     UserPromptSubmit|PostToolUse) set_state working ;;
     PreToolUse)
       case $(json_get '.tool_name' tool_name) in
-        AskUserQuestion|ExitPlanMode) set_state ask ;;   # waiting on your answer, not busy
+        # A question is a tool call that waits on you. Plan approval is not
+        # listed: it arrives as a PermissionRequest like any other prompt, and
+        # mapping it here too would flag (and sound) the same wait twice.
+        AskUserQuestion) set_state ask ;;
         *) set_state working ;;
       esac ;;
     PermissionRequest) set_state blocked ;;
