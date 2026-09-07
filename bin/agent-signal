@@ -151,6 +151,21 @@ paint_window() { # paint_window <window> <state-or-hold>
   fi
 }
 
+# Claude runs hooks concurrently, and refreshing a window is a read-modify-write
+# across many tmux calls. A per-window mkdir lock keeps two hooks for panes in
+# the same window from overwriting each other's result.
+lock_window() { # lock_window <window>
+  LOCK="${TMPDIR:-/tmp}/agent-signal.$(id -u).lock.${1#@}"
+  i=0
+  until mkdir "$LOCK" 2>/dev/null; do
+    i=$((i + 1))
+    [ "$i" -gt 100 ] && { rmdir "$LOCK" 2>/dev/null; continue; }   # stale lock (killed holder): reclaim
+    sleep 0.02
+  done
+  trap 'rmdir "$LOCK" 2>/dev/null' EXIT INT TERM
+}
+unlock_window() { rmdir "${LOCK:-/nonexistent}" 2>/dev/null; trap - EXIT INT TERM; }
+
 refresh_window() { # refresh_window <window> [event]
   win=$1; ev=${2:-}
   prev=$(t show-option -wqv -t "$win" @agent_state)
@@ -223,6 +238,7 @@ refresh_summary() { # one glyph per agent pane, coloured by state; count of wind
 set_state() { # set_state <state> [pane]
   pane=$(resolve_pane "${2:-}")
   win=$(window_of "$pane") || exit 0
+  lock_window "$win"
   case $1 in
     working|blocked|ask|done) t set-option -p -t "$pane" @agent_pane_state "$1" ;;
     idle|clear|"")        t set-option -up -t "$pane" @agent_pane_state ;;
@@ -235,6 +251,7 @@ set_state() { # set_state <state> [pane]
   fi
   needs_you "$1" && bell "$pane"
   refresh_window "$win" event
+  unlock_window
 }
 
 # --- Claude Code hook mapping ---------------------------------------------
@@ -291,10 +308,12 @@ current_window() { t display -p '#{window_id}'; }
 seen() {
   win=$(current_window)
   [ "$(t show-option -wqv -t "$win" @agent_state)" = "done" ] || return 0
+  lock_window "$win"
   for p in $(t list-panes -t "$win" -F '#{pane_id}'); do
     [ "$(pane_state "$p")" = "done" ] && t set-option -up -t "$p" @agent_pane_state
   done
   refresh_window "$win"
+  unlock_window
 }
 
 next() {
@@ -317,6 +336,7 @@ next() {
 
 hold() { # hold wait|park|clear [window]
   win=${2:-$(current_window)}
+  lock_window "$win"
   cur=$(t show-option -wqv -t "$win" @agent_hold)
   case $1 in
     clear) t set-option -uw -t "$win" @agent_hold ;;
@@ -325,6 +345,7 @@ hold() { # hold wait|park|clear [window]
       else t set-option -w -t "$win" @agent_hold "$1"; fi ;;
   esac
   refresh_window "$win"
+  unlock_window
 }
 
 # --- listing for the switcher ---------------------------------------------
