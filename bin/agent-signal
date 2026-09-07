@@ -160,7 +160,7 @@ refresh_window() { # refresh_window <window> [event]
     case $(pane_state "$p") in
       blocked) agg=blocked ;;
       ask)     [ "$agg" != blocked ] && agg=ask ;;
-      done)    needs_you "$agg" || agg=done ;;
+      done)    needs_you "$agg" || agg="done" ;;
       working) [ -z "$agg" ] && agg=working ;;
     esac
   done
@@ -171,9 +171,9 @@ refresh_window() { # refresh_window <window> [event]
   fi
 
   # Finished while you were already looking at it -> nothing to flag.
-  if [ "$agg" = done ] && [ -n "$ev" ] && visible "$win"; then
+  if [ "$agg" = "done" ] && [ -n "$ev" ] && visible "$win"; then
     for p in $(t list-panes -t "$win" -F '#{pane_id}'); do
-      [ "$(pane_state "$p")" = done ] && t set-option -up -t "$p" @agent_pane_state
+      [ "$(pane_state "$p")" = "done" ] && t set-option -up -t "$p" @agent_pane_state
     done
     agg=""
   fi
@@ -228,8 +228,11 @@ set_state() { # set_state <state> [pane]
     idle|clear|"")        t set-option -up -t "$pane" @agent_pane_state ;;
     *) echo "agent-signal: unknown state '$1'" >&2; exit 1 ;;
   esac
-  [ "$1" = clear ] && { t set-option -up -t "$pane" @agent_kind; t set-option -up -t "$pane" @agent_name; } \
-                   || t set-option -p -t "$pane" @agent_kind "${AGENT_KIND:-agent}"
+  if [ "$1" = clear ]; then
+    t set-option -up -t "$pane" @agent_kind; t set-option -up -t "$pane" @agent_name
+  else
+    t set-option -p -t "$pane" @agent_kind "${AGENT_KIND:-agent}"
+  fi
   needs_you "$1" && bell "$pane"
   refresh_window "$win" event
 }
@@ -254,11 +257,11 @@ hook() {
         idle_prompt)
           # Fires ~60s after any finish. Only a pane still marked working needs
           # rescuing (turn ended without a Stop, e.g. Esc); otherwise leave it.
-          [ "$(pane_state "$(resolve_pane)")" = working ] && set_state done ;;
+          [ "$(pane_state "$(resolve_pane)")" = working ] && set_state "done" ;;
       esac ;;
     Stop|StopFailure)
       n=$(json_get '(.background_tasks // []) | length' background_tasks)
-      case $n in ''|0) set_state done ;; *) set_state working ;; esac ;;
+      case $n in ''|0) set_state "done" ;; *) set_state working ;; esac ;;
     SessionEnd)        set_state clear ;;
   esac
 }
@@ -287,9 +290,9 @@ current_window() { t display -p '#{window_id}'; }
 
 seen() {
   win=$(current_window)
-  [ "$(t show-option -wqv -t "$win" @agent_state)" = done ] || return 0
+  [ "$(t show-option -wqv -t "$win" @agent_state)" = "done" ] || return 0
   for p in $(t list-panes -t "$win" -F '#{pane_id}'); do
-    [ "$(pane_state "$p")" = done ] && t set-option -up -t "$p" @agent_pane_state
+    [ "$(pane_state "$p")" = "done" ] && t set-option -up -t "$p" @agent_pane_state
   done
   refresh_window "$win"
 }
@@ -301,7 +304,7 @@ next() {
   after=$(printf '%s\n' "$list" | sed -n "/^$cur /,\$p" | sed '1d')
   before=$(printf '%s\n' "$list" | sed "/^$cur /,\$d")
   ordered=$(printf '%s\n%s\n' "$after" "$before")
-  for want in blocked ask done; do
+  for want in blocked ask "done"; do
     target=$(printf '%s\n' "$ordered" | awk -v w="$want" '$3==w && $4=="" {print $1" "$2; exit}')
     if [ -n "$target" ]; then
       t switch-client -t "${target#* }" 2>/dev/null

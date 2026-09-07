@@ -46,7 +46,7 @@ while :; do
       continue ;;
     ctrl-w|ctrl-p)
       [ -n "$win" ] || continue
-      mode=wait; [ "$key" = ctrl-p ] && mode=park
+      mode="wait"; [ "$key" = ctrl-p ] && mode="park"
       "$AS" hold "$mode" "$win"
       continue ;;
     *)

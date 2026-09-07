@@ -22,7 +22,7 @@ T -f /dev/null new-session -d -s main -n shell -x 120 -y 30
 T set-option -g @agent_signal_sound off          # no afplay in CI
 T set-option -g @agent_signal_tab_colour on
 # The scripts talk to whatever server $TMUX points at, so point it at ours.
-export TMUX="${TMUX_TMPDIR:-/tmp}/tmux-$(id -u)/$SOCK,0,0"
+TMUX="${TMUX_TMPDIR:-/tmp}/tmux-$(id -u)/$SOCK,0,0"; export TMUX
 sh "$ROOT/agent-signal.tmux"
 
 W_API=$(T new-window -d -n api -P -F '#{window_id}')
@@ -69,26 +69,26 @@ is "Notification permission_prompt -> blocked" "$(wst "$W_API")" blocked
 hook "$P_API" Stop '{"background_tasks":[{"id":"x"}]}'
 is "Stop with background task -> working" "$(wst "$W_API")" working
 hook "$P_API" Stop '{"background_tasks":[]}'
-is "Stop -> done (window hidden)"    "$(wst "$W_API")" done
+is "Stop -> done (window hidden)"    "$(wst "$W_API")" "done"
 is "done colours the tab green"      "$(wstyle "$W_API")" "fg=black,bg=green,bold"
 is "done does not count as needing you" "$(gneeds)" ""
 
 echo "idle reminder"
 hook "$P_API" Notification '{"notification_type":"idle_prompt"}'
-is "idle_prompt on a done pane leaves it done" "$(wst "$W_API")" done
+is "idle_prompt on a done pane leaves it done" "$(wst "$W_API")" "done"
 T set-option -up -t "$P_API" @agent_pane_state; "$AS" seen >/dev/null 2>&1; T set-option -uw -t "$W_API" @agent_state
 hook "$P_API" Notification '{"notification_type":"idle_prompt"}'
 is "idle_prompt on an idle pane stays idle" "$(wst "$W_API")" ""
 hook "$P_API" PreToolUse '{"tool_name":"Bash"}'
 hook "$P_API" Notification '{"notification_type":"idle_prompt"}'
-is "idle_prompt rescues an interrupted turn -> done" "$(wst "$W_API")" done
+is "idle_prompt rescues an interrupted turn -> done" "$(wst "$W_API")" "done"
 
 echo "viewed -> idle"
 T select-window -t "$W_API"; sleep 0.5
 is "viewing a done window clears it (after-select-window hook)" "$(wst "$W_API")" ""
 hook "$P_API" UserPromptSubmit; hook "$P_API" Stop
 # No client is attached to the test server, so nobody is "looking": done must show.
-is "finishing in the active window of a detached session still shows done" "$(wst "$W_API")" done
+is "finishing in the active window of a detached session still shows done" "$(wst "$W_API")" "done"
 hook "$P_API" SessionEnd
 T select-window -t "$W_WEB"; sleep 0.3
 
@@ -98,11 +98,11 @@ hook "$P_WEB2" PermissionRequest
 is "blocked pane outranks working pane" "$(wst "$W_WEB")" blocked
 hook "$P_WEB2" PostToolUse
 hook "$P_WEB" Stop
-is "done outranks working"           "$(wst "$W_WEB")" done
+is "done outranks working"           "$(wst "$W_WEB")" "done"
 hook "$P_WEB2" Stop
 hook "$P_WEB" SessionEnd
 is "SessionEnd clears its pane only" "$(pst "$P_WEB")" ""
-is "window keeps the other pane's state" "$(wst "$W_WEB")" done
+is "window keeps the other pane's state" "$(wst "$W_WEB")" "done"
 
 echo "wait and park"
 "$AS" hold wait "$W_WEB"
