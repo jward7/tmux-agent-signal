@@ -1,5 +1,32 @@
 # Changelog
 
+## 0.2.0 (2026-09-07)
+
+Hardening from a full review; no new features.
+
+- Updates to a window are serialised with a per-window lock, so concurrent
+  Claude hooks cannot overwrite each other.
+- The idle-reminder hook exits 0 when there is nothing to rescue.
+- `next` handles session names containing spaces.
+- A user's or theme's per-window `window-status-style` is never removed
+  unless the plugin set it.
+- The switcher survives an empty window name and aligns columns with
+  multibyte icons.
+- `@agent_needs` counts windows, as documented, not panes.
+- `seen` acts on the window the hook fired for, so a second attached client
+  cannot clear the wrong window.
+- Per-event cost roughly halved: one read for all pane states, batched
+  writes, one awk for the summary, no temp file.
+- The no-jq fallback reads spaced JSON and the background task array.
+- Installer quotes the plugin path, keeps the first backup, registers
+  StopFailure, and cleans up on failure.
+- Style options are validated before reaching tmux.
+- `uninstall` subcommand; existing key bindings are never clobbered.
+- `help` subcommand and real argument errors.
+- Entry file and switcher no longer crash when tmux is off PATH.
+- Tests: 83 checks, polling instead of sleeps, coverage for every item above.
+- CI lints the demo script and cancels superseded runs.
+
 ## 0.1.0 (2026-09-07)
 
 Initial release.

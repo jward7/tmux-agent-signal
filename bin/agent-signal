@@ -1,6 +1,6 @@
 #!/bin/sh
 # shellcheck disable=SC1010,SC2209  # done, "wait", "park" are state words here, not keywords
-# agent-signal: per-window AI coding-agent state in the tmux status bar.
+# agent-signal 0.2.0: per-window AI coding-agent state in the tmux status bar.
 #
 # State lives in tmux user options, written by agent hooks and read natively
 # by the status line. No daemon, no polling, nothing runs on redraw.
@@ -27,6 +27,7 @@
 #   agent-signal summary                       recompute the status-right glyphs and needs-you count
 #   agent-signal install-claude-hooks          merge hooks into ~/.claude/settings.json (needs jq)
 #   agent-signal uninstall                     undo everything the entry file set on the server
+#   agent-signal help | version
 set -u
 
 PLUGIN_DIR=$(cd "$(dirname "$0")/.." && pwd)
@@ -46,7 +47,7 @@ else
 fi
 t() { "$TMUX_BIN" "$@"; }
 
-case ${1:-} in install-claude-hooks|help|-h|--help) ;; *) [ -n "${TMUX:-}" ] || exit 0 ;; esac
+case ${1:-} in install-claude-hooks|help|-h|--help|version|--version) ;; *) [ -n "${TMUX:-}" ] || exit 0 ;; esac
 
 # --- options ---------------------------------------------------------------
 opt() { # opt <name> <default>
@@ -461,6 +462,7 @@ case ${1:-} in
   install-claude-hooks) install_claude_hooks ;;
   uninstall) uninstall ;;
   help|-h|--help) usage ;;
+  version|--version) sed -n 's/^# agent-signal \([0-9.]*\):.*/\1/p' "$0" ;;
   "") usage >&2; exit 1 ;;
   *) echo "agent-signal: unknown command '$1'" >&2; usage >&2; exit 1 ;;
 esac
