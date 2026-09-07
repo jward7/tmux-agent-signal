@@ -34,10 +34,11 @@ or park.
 
 Sounds play for blocked, ask and done, only when the window is not on screen.
 
-**Fleet summary.** One glyph per agent pane is prepended to `status-right`,
-coloured by that pane's state: `✳` Claude, `⬢` Codex, `π` Pi, `●` anything
-else. A glance at the right edge tells you how many agents you have and how
-many need you, across every session.
+**Fleet summary.** One entry per agent pane is prepended to `status-right`:
+a glyph for the agent kind (`✳` Claude, `⬢` Codex, `π` Pi, `●` other)
+followed by its window index, coloured by that pane's state, like
+`✳1 ✳2 ✳4 ✳6`. The number is the window to jump to with `prefix + <index>`,
+so an orange `✳4` means "window 4 needs you".
 
 **Terminal title.** With `@agent_signal_title on`, tmux sets the outer
 terminal's title to `[2 need you] session:window`, so iTerm2's tab shows the

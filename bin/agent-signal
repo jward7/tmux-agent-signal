@@ -200,7 +200,7 @@ glyph_for() { # glyph_for <kind>
 refresh_summary() { # one glyph per agent pane, coloured by state; count of windows needing you
   glyphs=""; needs=0
   # window_id first: `read` strips leading IFS whitespace, so an empty first field would shift the rest
-  t list-panes -a -F '#{window_id}	#{?@agent_kind,#{@agent_kind},-}	#{?@agent_pane_state,#{@agent_pane_state},-}' | while IFS='	' read -r wid kind st; do
+  t list-panes -a -F '#{window_id}	#{?@agent_kind,#{@agent_kind},-}	#{?@agent_pane_state,#{@agent_pane_state},-}	#{window_index}' | while IFS='	' read -r wid kind st widx; do
     [ "$kind" != - ] || continue
     [ "$st" = - ] && st=""
     case $st in
@@ -210,9 +210,10 @@ refresh_summary() { # one glyph per agent pane, coloured by state; count of wind
       done)    c=$(opt @agent_signal_colour_done green) ;;
       *)       c=$(opt @agent_signal_colour_idle colour245) ;;
     esac
-    printf '%s\t%s\n' "#[fg=$c]$(glyph_for "$kind")" "$( needs_you "$st" && printf '%s' "$wid" )"
+    # "<glyph><window index>" so the summary doubles as a jump list: prefix + <index>
+    printf '%s\t%s\n' "#[fg=$c]$(glyph_for "$kind")$widx" "$( needs_you "$st" && printf '%s' "$wid" )"
   done > "${TMPDIR:-/tmp}/agent-signal.$$"
-  glyphs=$(cut -f1 "${TMPDIR:-/tmp}/agent-signal.$$" | tr -d '\n')
+  glyphs=$(cut -f1 "${TMPDIR:-/tmp}/agent-signal.$$" | tr '\n' ' ' | sed 's/ $//')
   needs=$(cut -f2 "${TMPDIR:-/tmp}/agent-signal.$$" | grep -c .)
   rm -f "${TMPDIR:-/tmp}/agent-signal.$$"
   if [ -n "$glyphs" ]; then t set-option -g @agent_summary "${glyphs}#[default] "; else t set-option -gu @agent_summary; fi
