@@ -6,11 +6,11 @@
 #   sh test/run.sh              run all of them
 #   KEEP=1 sh test/t-hooks.sh   leave that test's server running for inspection
 #
-# No client is ever attached to that server, so no window is ever "visible" to
-# the plugin. The auto-acknowledge branch in bin/agent-signal -- finishing in a
-# window you are already looking at clears the flag instead of raising it --
-# needs an attached client and is therefore out of scope for this suite: the
-# tests assert the "nobody is looking" side of it, where done always shows.
+# By default no client is attached to that server, so no window is "visible"
+# to the plugin and done always shows. The auto-acknowledge branch -- finishing
+# in a window you are already looking at clears the flag instead of raising
+# it -- needs a client: attach_client gives one on a pseudo-terminal, and
+# focus in|out drives its focus the way a terminal reports it (t-focus.sh).
 set -u
 
 ROOT=$(cd "$(dirname "$0")/.." && pwd)
@@ -52,6 +52,34 @@ ascii() { # ascii on|off
   if [ "$1" = on ]; then T set-option -g @agent_signal_ascii on
   else T set-option -gu @agent_signal_ascii; fi
 }
+# A real client attached to <session>, on a pseudo-terminal made by script(1),
+# reading its terminal input from a FIFO so tests can type into it. Sets
+# CLIENT_PIDS for cleanup. util-linux and BSD script take different arguments.
+attach_client() { # attach_client <session>
+  FIFO="$TMPDIR/client-input"
+  mkfifo "$FIFO"
+  # Hold the FIFO open, or the client's terminal sees end of input and quits.
+  (exec 3>"$FIFO"; while :; do sleep 1; done) & CLIENT_PIDS="$!"
+  if script --version 2>/dev/null | grep -q util-linux; then
+    TERM=xterm-256color script -qfec "tmux -L $SOCK attach -t $1" /dev/null <"$FIFO" >/dev/null 2>&1 &
+  else
+    TERM=xterm-256color script -q /dev/null tmux -L "$SOCK" attach -t "$1" <"$FIFO" >/dev/null 2>&1 &
+  fi
+  CLIENT_PIDS="$CLIENT_PIDS $!"
+  i=0; while [ -z "$(T list-clients)" ] && [ $i -lt 100 ]; do sleep 0.05; i=$((i + 1)); done
+}
+# Send the terminal's focus report (CSI I / CSI O) and wait until tmux has
+# taken it in. Needs focus-events on.
+focus() { # focus in|out
+  if [ "$1" = in ]; then printf '\033[I' >"$FIFO"; want=yes; else printf '\033[O' >"$FIFO"; want=no; fi
+  i=0
+  while [ $i -lt 100 ]; do
+    case ",$(T list-clients -F '#{client_flags}')," in *,focused,*) got=yes ;; *) got=no ;; esac
+    [ "$got" = "$want" ] && return 0
+    sleep 0.05; i=$((i + 1))
+  done
+}
+
 # How many files or directories matching <pattern> the scripts left in the
 # private TMPDIR of this test file.
 leftovers() { # leftovers <pattern>
@@ -66,6 +94,8 @@ cleanup() {
   [ "$_cleaned" = 0 ] || return 0
   _cleaned=1
   [ "${KEEP:-}" != 1 ] || return 0
+  # shellcheck disable=SC2086  # a list of pids, split on purpose
+  [ -z "${CLIENT_PIDS:-}" ] || kill $CLIENT_PIDS 2>/dev/null
   T kill-server 2>/dev/null
   # tmux leaves the socket file behind, and this name is used once ever.
   rm -f "$SOCK_PATH"

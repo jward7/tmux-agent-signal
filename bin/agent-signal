@@ -88,8 +88,13 @@ window_of() { t display -p -t "$1" '#{window_id}'; }
 pane_state() { t display -p -t "$1" '#{@agent_pane_state}' 2>/dev/null; }
 pane_opt()   { t display -p -t "$1" "#{$2}" 2>/dev/null; }
 
-visible() { # visible <window> -> 0 if that window is on screen in an attached client
-  [ "$(t display -p -t "$1" '#{window_active}#{?session_attached,1,0}')" = "11" ]
+visible() { # visible <window> -> 0 if a focused client is showing that window
+  # Attached is not enough: with one session per terminal tab every session
+  # is attached, but only the focused tab is on screen. tmux tracks focus from
+  # the terminal's focus reports (focus-events); a client starts out focused
+  # and stays so when its terminal never reports, which keeps the old meaning.
+  t list-clients -F '#{window_id} #{client_flags}' |
+    awk -v w="$1" '$1 == w && ("," $2 ",") ~ /,focused,/ { found = 1 } END { exit !found }'
 }
 
 play() { # play <state>
@@ -511,7 +516,7 @@ uninstall() {
     esac
     [ "$new" != "$cur" ] && t set-option -g "$o" "$new"
   done
-  for h in after-select-window client-session-changed client-attached pane-exited after-kill-pane window-unlinked; do
+  for h in after-select-window client-session-changed client-attached client-focus-in pane-exited after-kill-pane window-unlinked; do
     t set-hook -gu "${h}[91]" 2>/dev/null
   done
   for k in "$(opt @agent_signal_key_next N)" "$(opt @agent_signal_key_switcher A)" "$(opt @agent_signal_key_wait W)" "$(opt @agent_signal_key_park P)"; do

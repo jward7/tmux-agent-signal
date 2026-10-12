@@ -62,7 +62,9 @@ bind @agent_signal_key_park     P "run-shell -b '$AS hold park'"
 # run-shell expands formats, so each hook names the window it fired for rather
 # than relying on tmux's idea of the "current" client, which is ambiguous with
 # more than one client attached.
-for h in after-select-window client-session-changed client-attached; do
+# client-focus-in covers switching terminal tabs: the window was already
+# selected in its session, only the terminal's focus moved to it.
+for h in after-select-window client-session-changed client-attached client-focus-in; do
   t set-hook -g "${h}[91]" "run-shell -b '$AS seen #{window_id}'"
 done
 

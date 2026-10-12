@@ -1,5 +1,19 @@
 # Changelog
 
+## Unreleased
+
+- "On screen" now needs a focused client showing the window, not just an
+  attached session. With one session per terminal tab every session is
+  attached, so a turn finishing in a background tab went straight to idle
+  and never showed `done` or alerted. Focus comes from the terminal's focus
+  reports (`focus-events on`); a terminal that never reports focus keeps the
+  old behaviour.
+- A `client-focus-in` hook clears `done` when you switch back to the
+  terminal tab showing that window.
+- Tests can attach a real client on a pseudo-terminal and drive its focus
+  (`attach_client`, `focus` in `test/lib.sh`); `t-focus.sh` covers the
+  on-screen check, which had no client-side test before.
+
 ## 0.3.0 (2026-09-07)
 
 - Installable as a Claude Code plugin: `/plugin marketplace add
