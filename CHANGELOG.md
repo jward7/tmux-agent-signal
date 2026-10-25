@@ -1,8 +1,9 @@
 # Changelog
 
-## Unreleased
+## 0.4.2 (2026-10-25)
 
-Bugs found by a test-coverage audit, each now pinned by a test.
+Bugs found by a test-coverage audit, each now pinned by a test. The suite
+grew from 142 to 401 checks across 27 files.
 
 - A hold on a window with no state was misread as the state (a tab-separated
   read dropped the empty first field): `park` on an idle window showed no
@@ -29,7 +30,13 @@ Bugs found by a test-coverage audit, each now pinned by a test.
   expects all eight.
 - Tests: every hook event and argument edge case, the Claude session registry
   against a fake `$HOME`, every integration hook command executed against a
-  live server, installer edge cases, and more of the no-jq fallback.
+  live server, installer edge cases, the bell, desktop notifications (PATH
+  shims), per-kind glyphs and colours, the terminal title, stale lock
+  reclaim, and more of `list`, `next`, `seen`, `uninstall` and the no-jq
+  fallback.
+- README states what CI tests (tmux 3.4 and 3.7) and that on tmux 3.4 a dead
+  pane's glyph lingers until the next event, a tmux quirk fixed in 3.5. The
+  minimum stays 3.1.
 
 ## 0.4.1 (2026-10-25)
 

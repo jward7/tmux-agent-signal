@@ -65,7 +65,9 @@ session (asks first unless `@agent_signal_confirm_close off`), `ctrl-w` wait,
 
 ## Install
 
-Requirements: tmux 3.1+ (pane options), `/bin/sh`. Optional: `jq` (hook JSON
+Requirements: tmux 3.1+ (pane options), `/bin/sh`. Tested in CI on tmux 3.4
+(Ubuntu 24.04) and 3.7 (Homebrew); 3.5 or later is nicer (see the dead-pane
+note under Troubleshooting) but not required. Optional: `jq` (hook JSON
 parsing and the hook installer; without it a sed fallback is used),
 `fzf` for the switcher, `afplay` (macOS) or `paplay` (Linux) for sounds.
 
