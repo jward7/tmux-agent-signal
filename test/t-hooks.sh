@@ -31,6 +31,8 @@ printf '{}' | AGENT_SIGNAL_DISABLE=1 TMUX_PANE=$P_API "$AS" hook PermissionReque
 is "AGENT_SIGNAL_DISABLE silences a nested agent's hooks" "$(wst "$W_API")" working
 printf '{}' | AGENT_SIGNAL_DISABLE=1 TMUX_PANE=$P_API "$AS" set blocked; rc=$?
 is "AGENT_SIGNAL_DISABLE exits 0 so the agent never notices" "$rc" 0
+printf '{}' | CLAUDE_JOB_DIR=/tmp/job TMUX_PANE=$P_API "$AS" hook Stop
+is "a Claude background job's hooks never touch the pane" "$(wst "$W_API")" working
 hook "$P_API" PermissionRequest
 is "PermissionRequest -> blocked"    "$(wst "$W_API")" blocked
 is "blocked colours the tab"         "$(wstyle "$W_API")" "fg=black,bg=colour208,bold"

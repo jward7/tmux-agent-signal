@@ -124,6 +124,7 @@ a running session, or start a new one, so Claude reloads its config.
 | `Stop` or `StopFailure` with no background tasks | done    |
 | `Stop` while a background task is still running | working, until a later `Stop` reports it finished |
 | `SessionEnd`                                  | cleared |
+| any event from a background job (`CLAUDE_JOB_DIR` set) | ignored: the pane's state belongs to the interactive session |
 
 Hooks are registered `async` so they never delay Claude. Each call is a
 handful of tmux commands: on an 18-pane server one event costs about a dozen

@@ -350,6 +350,9 @@ set_state() { # set_state <state> [pane]
 
 # --- Claude Code hook mapping ---------------------------------------------
 hook() {
+  # A Claude background job (/bg, scheduled work) runs its hooks from the same
+  # pane environment as the interactive session and would overwrite its state.
+  [ -z "${CLAUDE_JOB_DIR:-}" ] || return 0
   JSON=$(cat 2>/dev/null || true)
   AGENT_KIND=claude
   case $1 in

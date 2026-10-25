@@ -2,6 +2,9 @@
 
 ## Unreleased
 
+- Hooks fired by a Claude background job (`CLAUDE_JOB_DIR` set) are ignored,
+  so a job finishing in the background no longer marks the interactive pane
+  done or working.
 - `AGENT_SIGNAL_DISABLE=1` in an agent's environment makes every report from
   it a no-op, so an agent launched inside another agent's pane does not
   overwrite its parent's state.
