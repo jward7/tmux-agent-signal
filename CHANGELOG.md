@@ -2,6 +2,9 @@
 
 ## Unreleased
 
+- Codex CLI integration rewritten on Codex's hooks (`[features] hooks = true`):
+  working, blocked and done instead of done only, with subagent events kept
+  as working so a child finishing does not mark the turn done.
 - A report with no pane given and no `TMUX_PANE` in the environment is
   attributed by process ancestry (the pane whose shell is an ancestor of the
   hook) rather than to the client's active pane, which was the wrong window

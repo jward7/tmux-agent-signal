@@ -15,7 +15,7 @@ nothing, so a broken indicator can never block an agent.
 | Agent | Integration | working | blocked | ask | done | Status |
 |---|---|:-:|:-:|:-:|:-:|---|
 | Claude Code | hooks (built in, see the main README) | yes | yes | yes | yes | exercised daily |
-| [Codex CLI](codex/) | `notify` in `config.toml` | | | | yes | from the docs, not exercised here |
+| [Codex CLI](codex/) | hooks in `hooks.json` (`[features] hooks = true`) | yes | yes | | yes | from the docs, not exercised here |
 | [Gemini CLI](gemini/) | hooks in `settings.json` | yes | yes | | yes | from the docs, not exercised here |
 | [Copilot CLI](copilot/) | hooks file | yes | yes | | yes | from the docs, not exercised here |
 | [OpenCode](opencode/) | plugin | yes | yes | | yes | from the docs, not exercised here |

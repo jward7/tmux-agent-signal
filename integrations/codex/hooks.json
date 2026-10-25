@@ -1,0 +1,11 @@
+{
+  "hooks": {
+    "SessionStart":      [{ "matcher": "startup|resume|clear", "hooks": [{ "type": "command", "command": "AGENT_KIND=codex \"$(tmux show -gv @agent_signal_command)\" set idle" }] }],
+    "UserPromptSubmit":  [{ "hooks": [{ "type": "command", "command": "AGENT_KIND=codex \"$(tmux show -gv @agent_signal_command)\" set working" }] }],
+    "PostToolUse":       [{ "hooks": [{ "type": "command", "command": "AGENT_KIND=codex \"$(tmux show -gv @agent_signal_command)\" set working" }] }],
+    "SubagentStart":     [{ "hooks": [{ "type": "command", "command": "AGENT_KIND=codex \"$(tmux show -gv @agent_signal_command)\" set working" }] }],
+    "SubagentStop":      [{ "hooks": [{ "type": "command", "command": "AGENT_KIND=codex \"$(tmux show -gv @agent_signal_command)\" set working" }] }],
+    "PermissionRequest": [{ "hooks": [{ "type": "command", "command": "AGENT_KIND=codex \"$(tmux show -gv @agent_signal_command)\" set blocked" }] }],
+    "Stop":              [{ "hooks": [{ "type": "command", "command": "AGENT_KIND=codex \"$(tmux show -gv @agent_signal_command)\" set done" }] }]
+  }
+}

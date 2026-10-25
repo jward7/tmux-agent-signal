@@ -352,7 +352,7 @@ without the triage, switcher and summary layers. 🟢 has it, 🟡 partial or op
 | Sounds | 🟢 | 🟡 bell; bring your own notifier | 🟢 | 🟢 | 🟢 | 🟢 |
 | Background task awareness | 🟢 | 🔴 | 🟢 | 🔴 | 🔴 | ▫️ |
 | Claude Code | 🟢 plugin or hooks | 🟢 plugin install | 🟢 | 🟢 | 🟢 | 🟢 |
-| Codex CLI | 🟡 done only, from docs | 🟡 done only | 🟢 | 🟢 | 🟡 presence only | 🟢 |
+| Codex CLI | 🟢 hooks, from docs | 🟡 done only | 🟢 | 🟢 | 🟡 presence only | 🟢 |
 | Pi / OpenCode | 🟡 from docs / 🟡 from docs | 🟢 / 🟢 | 🔴 / 🔴 | 🟢 / 🟢 | 🔴 | 🟢 |
 | Agent-to-agent API | 🔴 | 🔴 | 🔴 | 🔴 | 🔴 | 🟢 socket API |
 | Survives lid close / restart without resume | 🔴 use resurrect | 🔴 | 🔴 | 🔴 | 🔴 | 🟢 |
