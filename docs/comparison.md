@@ -22,7 +22,7 @@ summary layers. 🟢 has it, 🟡 partial or optional, 🔴 does not,
 | Jump to next needing you | 🟢 | 🟢 | 🟢 | 🔴 | 🔴 | 🟢 |
 | Wait / park triage | 🟢 | 🔴 | 🟢 | 🔴 | 🔴 | 🔴 |
 | Switcher with close actions | 🟢 fzf popup | 🔴 | 🟢 sidebar + popup | 🔴 | 🔴 | 🟢 |
-| Fleet summary in status bar | 🟢 | 🔴 | 🟢 | 🔴 | 🟡 badges only | 🟢 |
+| Fleet summary in status bar | 🟡 coloured tabs, needs-you count | 🔴 | 🟢 | 🔴 | 🟡 badges only | 🟢 |
 | Sounds | 🟢 | 🟡 bell; bring your own notifier | 🟢 | 🟢 | 🟢 | 🟢 |
 | Background task awareness | 🟢 | 🔴 | 🟢 | 🔴 | 🔴 | ▫️ |
 | Claude Code | 🟢 plugin or hooks | 🟢 plugin install | 🟢 | 🟢 | 🟢 | 🟢 |

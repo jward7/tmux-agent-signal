@@ -50,7 +50,7 @@ hook "$P_API" SessionEnd; T set-option -gu @agent_signal_tab_colour
 
 T set-option -w -t "$W_WEB" window-status-format '#I:#W THEMED'
 hook "$P_WEB" PermissionRequest
-is "a per-window format override gets the badge woven in" "$(T show-option -wv -t "$W_WEB" window-status-format)" "#I:#W THEMED$("$AS" badge-format)"
+is "a per-window format override gets the badge in front" "$(T show-option -wv -t "$W_WEB" window-status-format)" "$("$AS" badge-format)#I:#W THEMED"
 hook "$P_WEB" PermissionRequest
 is "and only once"                                         "$(T show-option -wv -t "$W_WEB" window-status-format | grep -o agent_icon | wc -l | tr -d ' ')" 2
 T set-option -uw -t "$W_WEB" window-status-format; hook "$P_WEB" SessionEnd

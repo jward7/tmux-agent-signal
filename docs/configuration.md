@@ -2,29 +2,18 @@
 
 Set any of these in `tmux.conf` before the plugin loads.
 
+The badges, their colours and the window-tab format are not options: the
+plugin has one look. What it publishes for your own formats:
+
+- `@agent_needs` (global): how many windows are blocked or asking, unset
+  when none. For example, in `status-left`:
+  `#{?@agent_needs,#[fg=black#,bg=colour208] #{@agent_needs} need you #[default],}`
+- `@agent_name` (pane): the agent's session name, from Claude's registry.
+
 ```tmux
-# Badges: "<icon> <fg> <bg>"; bg "default" leaves the tab colour alone
-set -g @agent_signal_working '~ yellow default'
-set -g @agent_signal_blocked '! black colour208'
-set -g @agent_signal_ask     '? black colour213'
-set -g @agent_signal_done    '✓ black green'
-set -g @agent_signal_wait    '… colour245 default'
-set -g @agent_signal_park    'p colour240 default'
 set -g @agent_signal_tab_colour all       # all: colour the tab for every state that has one
                                           # needs: colour it only when the window needs you (blocked, ask)
                                           # off: badge only, never restyle the tab
-set -g @agent_signal_ascii off            # on = plain ASCII defaults (+ . ?) for fonts without ✓ …
-
-# Fleet summary glyphs and colours (status-right)
-set -g @agent_signal_glyph_claude '✳'
-set -g @agent_signal_glyph_codex  '⬢'
-set -g @agent_signal_glyph_pi     'π'
-set -g @agent_signal_glyph_other  '●'
-set -g @agent_signal_colour_working yellow
-set -g @agent_signal_colour_blocked colour208
-set -g @agent_signal_colour_ask     colour213
-set -g @agent_signal_colour_done    green
-set -g @agent_signal_colour_idle    colour245
 
 # Outer terminal title
 set -g @agent_signal_title off            # on = set-titles with the needs-you count

@@ -13,7 +13,7 @@ ancestor of the caller, else the current client's window, unless one is given.
 | `hold wait\|park\|clear [window]` | toggle a triage hold |
 | `list` | the session > window > pane tree the switcher shows |
 | `sync` | pull names and presence from Claude's session registry |
-| `summary` | recompute the status-right glyphs and the needs-you count |
+| `needs` | recompute the needs-you count (`@agent_needs`) |
 | `check` | report what is wired on this server and what is missing; exit 1 if broken |
 | `install-claude-hooks` | merge the hooks into `~/.claude/settings.json` (needs jq) |
 | `uninstall` | reverse everything the entry file set on the server |

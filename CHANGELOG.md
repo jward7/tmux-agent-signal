@@ -2,6 +2,22 @@
 
 ## Unreleased
 
+- **One look.** The badge now sits in front of the window name (`!3:web`)
+  so it reads as part of that tab, and tmux's own window flag is dropped
+  while a badge shows (the `*` on the current tab used to hide it). Working
+  is a dim `~` rather than yellow: only blocked, ask and done compete for
+  attention. The plugin owns the two window-tab formats, keeping what it
+  found for `uninstall`, instead of appending to a theme's.
+- **Removed the status-right summary** (`@agent_summary`, one glyph per
+  agent pane). With more than a few agents it was a row of identical glyphs
+  and the coloured tabs already carry the same information. `@agent_needs`
+  stays for your own `status-left` or title. `agent-signal summary` is now
+  `agent-signal needs` (the old name still works).
+- **Removed the per-state badge, colour, glyph and ASCII options**
+  (`@agent_signal_working` and friends, `@agent_signal_glyph_*`,
+  `@agent_signal_colour_*`, `@agent_signal_ascii`). Good defaults instead of
+  a theme to configure. `@agent_signal_tab_colour` remains.
+
 - README rewritten around a logo, tagline and a recorded GIF of the states
   changing; the configuration, command, comparison, setup, internals and
   troubleshooting sections moved to `docs/`. `docs/record-demo.sh` regenerates

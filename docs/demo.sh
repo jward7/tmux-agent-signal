@@ -21,10 +21,9 @@ D set -g status-style 'bg=#666666,fg=#aaaaaa'
 D set -g window-status-style 'fg=#001a4d,bg=default'
 D set -g window-status-current-style 'fg=white,bold,bg=red'
 D set -g status-justify centre
-D set -g status-left-length 50
 D set -g status-right-length 90
 D set -g status-right "#{?client_prefix,#[reverse]<Prefix>#[noreverse], } #[fg=green]✓ CI main#[default]  [86%%] ⚡  Mon, Sep 07 - 10:42 "
-D set -g status-left "#{?@agent_needs,#[fg=black#,bg=colour208#,bold] #{@agent_needs} need you #[default],#[fg=colour245] clear #[default]} #[fg=cyan]#{@agent_name}#[default]"
+D set -g status-left "[work] "
 D set -g @agent_signal_sound off
 
 # The plugin scripts exit early unless $TMUX is set, and use it to find the

@@ -10,7 +10,6 @@
 #   pane   @agent_name    display name (from Claude's session registry)
 #   window @agent_state   aggregate of its panes: blocked > ask > done > working
 #   window @agent_since   epoch seconds when @agent_state last changed (next serves the oldest first)
-#   global @agent_summary  one coloured glyph per agent pane, for status-right
 #   global @agent_needs    count of windows needing you (blocked or ask), for titles
 #   window @agent_hold    wait | park                (user triage override)
 #   window @agent_icon / @agent_fg                   what the status bar draws
@@ -26,7 +25,7 @@
 #   agent-signal hold wait|park|clear [window] triage a window (default: current); wait/park toggle
 #   agent-signal list                          tree of sessions/windows/panes (for the switcher)
 #   agent-signal sync                          pull names/presence from ~/.claude/sessions
-#   agent-signal summary                       recompute the status-right glyphs and needs-you count
+#   agent-signal needs                         recompute the needs-you count
 #   agent-signal install-claude-hooks          merge hooks into ~/.claude/settings.json (needs jq)
 #   agent-signal check                         report what is wired and what is missing (exit 1 if broken)
 #   agent-signal uninstall                     undo everything the entry file set on the server
@@ -181,19 +180,16 @@ bell() { # bell <pane>: ring tmux's own bell in that pane (monitor-bell, SSH-saf
 }
 
 # --- state -----------------------------------------------------------------
+# One look, not a theme: the badge glyph says which kind of attention a window
+# wants, the tab colour says how urgently. Working and the holds are quiet.
 style_for() { # style_for <state|hold> -> "icon fg bg"
-  if [ "$(opt @agent_signal_ascii off)" = on ]; then
-    d_done="+ black green"; d_wait=". colour245 default"; d_ask="? black colour213"
-  else
-    d_done="✓ black green"; d_wait="… colour245 default"; d_ask="? black colour213"
-  fi
   case $1 in
-    working) printf '%s' "$(opt @agent_signal_working "~ yellow default")" ;;
-    blocked) printf '%s' "$(opt @agent_signal_blocked "! black colour208")" ;;
-    ask)     printf '%s' "$(opt @agent_signal_ask "$d_ask")" ;;
-    done)    printf '%s' "$(opt @agent_signal_done "$d_done")" ;;
-    wait)    printf '%s' "$(opt @agent_signal_wait "$d_wait")" ;;
-    park)    printf '%s' "$(opt @agent_signal_park "p colour240 default")" ;;
+    working) printf '%s' "~ colour245 default" ;;
+    blocked) printf '%s' "! black colour208" ;;
+    ask)     printf '%s' "? black colour213" ;;
+    done)    printf '%s' "✓ black green" ;;
+    wait)    printf '%s' "… colour245 default" ;;
+    park)    printf '%s' "p colour240 default" ;;
     *)       printf '' ;;
   esac
 }
@@ -213,10 +209,6 @@ restore_tab() { # restore_tab <window>
 
 paint_window() { # paint_window <window> <state-or-hold>
   set -- "$1" "$(style_for "$2")" "$2"
-  case $2 in
-    ""|*' '*' '*) ;;   # empty, or the three fields we need
-    *) echo "agent-signal: option for '$3' must be '<icon> <fg> <bg>', got '$2'" >&2; return 0 ;;
-  esac
   if [ -z "$2" ]; then
     t set-option -uw -t "$1" @agent_icon \; set-option -uw -t "$1" @agent_fg
     restore_tab "$1"
@@ -275,15 +267,20 @@ clear_done_panes() { # clear_done_panes <window>: acknowledge every done pane
   done
 }
 
-BADGE='#{?#{@agent_icon}, #[fg=#{@agent_fg}#,bold]#{@agent_icon}#[default],}'
+# The badge sits in front of the window name so it reads as part of that tab:
+# "!3:web". The plugin owns the window formats: tmux's own flag (* - # !) is
+# dropped while a badge is showing, since the current tab is already styled
+# and a flag after the name hid the badge's meaning.
+BADGE='#{?#{@agent_icon},#[fg=#{@agent_fg}#,bold]#{@agent_icon}#[default],}'
+WINDOW_FORMAT="${BADGE}#I:#W#{?#{@agent_icon},,#{?window_flags,#{window_flags}, }}"
 
 # A theme that sets window-status-format per window outranks the global one
-# and hides the badge on that window. Weave it into the window's own value.
+# and hides the badge on that window. Put it in front of the window's own value.
 mend_window_format() { # mend_window_format <window>
   for o in window-status-format window-status-current-format; do
     cur=$(t show-option -wqv -t "$1" "$o")
     [ -n "$cur" ] || continue
-    case $cur in *@agent_icon*) ;; *) t set-option -w -t "$1" "$o" "${cur}${BADGE}" ;; esac
+    case $cur in *@agent_icon*) ;; *) t set-option -w -t "$1" "$o" "${BADGE}${cur}" ;; esac
   done
 }
 
@@ -333,34 +330,13 @@ EOF2
       alert_command "$agg" "$prev" "$win" "${EVENT_PANE:-}" ;;
     esac
   fi
-  refresh_summary
+  refresh_needs
 }
 
-refresh_summary() { # one glyph per agent pane, coloured by state; count of windows needing you
-  # Read the nine colour/glyph options once, not once per pane.
-  c_working=$(opt @agent_signal_colour_working yellow)
-  c_blocked=$(opt @agent_signal_colour_blocked colour208)
-  c_ask=$(opt @agent_signal_colour_ask colour213)
-  c_done=$(opt @agent_signal_colour_done green)
-  c_idle=$(opt @agent_signal_colour_idle colour245)
-  g_claude=$(opt @agent_signal_glyph_claude '✳')
-  g_codex=$(opt @agent_signal_glyph_codex '⬢')
-  g_pi=$(opt @agent_signal_glyph_pi 'π')
-  g_other=$(opt @agent_signal_glyph_other '●')
-  # One list-panes, one awk: prints "<glyphs>\t<windows needing you>". Dead panes
-  # (remain-on-exit) are skipped so a crashed agent does not linger as a glyph.
-  out=$(t list-panes -a -F '#{window_id}	#{?@agent_kind,#{@agent_kind},-}	#{?@agent_pane_state,#{@agent_pane_state},-}	#{window_index}	#{pane_dead}' \
-    | awk -F'	' -v cw="$c_working" -v cb="$c_blocked" -v ca="$c_ask" -v cd="$c_done" -v ci="$c_idle" \
-          -v gc="$g_claude" -v gx="$g_codex" -v gp="$g_pi" -v go="$g_other" '
-      $2 == "-" || $5 == "1" { next }
-      { c = ci; if ($3 == "working") c = cw; else if ($3 == "blocked") c = cb; else if ($3 == "ask") c = ca; else if ($3 == "done") c = cd
-        g = go; if ($2 == "claude") g = gc; else if ($2 == "codex") g = gx; else if ($2 == "pi") g = gp
-        # "<glyph><window index>" so the summary doubles as a jump list: prefix + <index>
-        glyphs = glyphs (glyphs == "" ? "" : " ") "#[fg=" c "]" g $4
-        if (($3 == "blocked" || $3 == "ask") && !seen[$1]++) needs++ }
-      END { printf "%s\t%d\n", glyphs, needs }')
-  glyphs=${out%	*}; needs=${out#*	}
-  if [ -n "$glyphs" ]; then t set-option -g @agent_summary "${glyphs}#[default] "; else t set-option -gu @agent_summary; fi
+refresh_needs() { # count of windows needing you (blocked or ask), for titles and your own status line
+  # Dead panes (remain-on-exit) are skipped so a crashed agent does not linger.
+  needs=$(t list-panes -a -F '#{window_id}	#{?@agent_pane_state,#{@agent_pane_state},-}	#{pane_dead}' \
+    | awk -F'	' '$3 != "1" && ($2 == "blocked" || $2 == "ask") && !seen[$1]++ { n++ } END { print n + 0 }')
   if [ "$needs" -gt 0 ]; then t set-option -g @agent_needs "$needs"; else t set-option -gu @agent_needs; fi
 }
 
@@ -444,7 +420,7 @@ sync_registry() {
         [ -n "$name" ] && [ "$name" != - ] && t set-option -p -t "$pane" @agent_name "$name"
         t set-option -p -t "$pane" @agent_kind claude; }
   done
-  refresh_summary
+  refresh_needs
 }
 
 # --- navigation & triage ---------------------------------------------------
@@ -549,7 +525,6 @@ check() {
   if [ -n "${TMUX:-}" ]; then say ok "inside tmux ($TMUX_BIN)"; else say fail "TMUX is not set: run this from a pane"; fi
   if [ "$(t show-option -gqv @agent_signal_command)" = "$SELF" ]; then say ok "command path published"; else say fail "@agent_signal_command not published: source agent-signal.tmux"; fi
   case $(t show-option -gv window-status-format) in *@agent_icon*) say ok "badge in window-status-format" ;; *) say fail "badge missing from window-status-format" ;; esac
-  case $(t show-option -gv status-right) in *@agent_summary*) say ok "summary in status-right" ;; *) say warn "summary not in status-right" ;; esac
   # Pane hooks (pane-exited, pane-died) are stored at window scope.
   n=$( { t show-hooks -g; t show-hooks -gw; } 2>/dev/null | grep -c "agent-signal"); if [ "$n" -ge 8 ]; then say ok "$n hooks installed"; else say fail "only $n of 8 hooks installed"; fi
   for k in next switcher wait park; do
@@ -570,13 +545,13 @@ check() {
 # --- uninstall -------------------------------------------------------------
 # The inverse of agent-signal.tmux plus a sweep of live windows and panes.
 uninstall() {
-  for o in window-status-format window-status-current-format status-right; do
-    cur=$(t show-option -gqv "$o")
-    case $o in
-      status-right) new=${cur#"#{@agent_summary}"} ;;
-      *) new=${cur%"#{?#{@agent_icon}, #[fg=#{@agent_fg}#,bold]#{@agent_icon}#[default],}"} ;;
+  # The window formats go back to what the entry file found.
+  for o in window-status-format window-status-current-format; do
+    case $(t show-option -gqv "$o") in *@agent_icon*)
+      saved=$(t show-option -gqv "@agent_saved_$o")
+      if [ -n "$saved" ]; then t set-option -g "$o" "$saved"; else t set-option -gu "$o"; fi ;;
     esac
-    [ "$new" != "$cur" ] && t set-option -g "$o" "$new"
+    t set-option -gu "@agent_saved_$o"
   done
   for h in after-select-window client-session-changed client-attached client-focus-in pane-exited pane-died after-kill-pane window-unlinked; do
     t set-hook -gu "${h}[91]" 2>/dev/null
@@ -596,14 +571,14 @@ uninstall() {
     # A badge woven into a per-window format by mend_window_format.
     for o in window-status-format window-status-current-format; do
       cur=$(t show-option -wqv -t "$w" "$o")
-      case $cur in *"$BADGE"*) t set-option -w -t "$w" "$o" "${cur%"$BADGE"}" ;; esac
+      case $cur in "$BADGE"*) t set-option -w -t "$w" "$o" "${cur#"$BADGE"}" ;; esac
     done
     t set-option -uw -t "$w" @agent_state \; set-option -uw -t "$w" @agent_since \; set-option -uw -t "$w" @agent_hold \; set-option -uw -t "$w" @agent_icon \; set-option -uw -t "$w" @agent_fg \; set-option -uw -t "$w" @agent_tab_saved
   done
   for p in $(t list-panes -a -F '#{pane_id}'); do
     t set-option -up -t "$p" @agent_pane_state \; set-option -up -t "$p" @agent_kind \; set-option -up -t "$p" @agent_name
   done
-  t set-option -gu @agent_summary; t set-option -gu @agent_needs; t set-option -gu @agent_signal_command
+  t set-option -gu @agent_needs; t set-option -gu @agent_signal_command
   echo "agent-signal: removed formats, hooks, key bindings and window/pane state. Claude hooks in ~/.claude/settings.json are left for you to delete."
 }
 
@@ -614,8 +589,9 @@ case ${1:-} in
   set)    [ -n "${2:-}" ] || { echo "agent-signal set: which state? working|blocked|ask|done|idle" >&2; exit 1; }; set_state "$2" "${3:-}" ;;
   clear)  set_state clear "${2:-}" ;;
   seen)   seen "${2:-}" ;;
-  summary) refresh_summary ;;
+  needs|summary) refresh_needs ;;
   badge-format) printf '%s\n' "$BADGE" ;;
+  window-format) printf '%s\n' "$WINDOW_FORMAT" ;;
   lock-path) lock_path "${2:?window}" ;;
   next)   next ;;
   hold)   case ${2:-} in wait|park|clear) hold "$2" "${3:-}" ;; *) echo "agent-signal hold: wait, park or clear" >&2; exit 1 ;; esac ;;

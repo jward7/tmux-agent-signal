@@ -15,9 +15,9 @@ c=$(tmux show -gv @agent_signal_command 2>/dev/null) && [ -n "$c" ] && AGENT_KIN
 ```
 
 so that outside tmux, or with tmux off PATH, the hook exits 0 and prints
-nothing instead of failing with "command not found". Set `AGENT_KIND=<agent>` so the switcher and
-the status-right summary label the pane. The script exits 0 and prints
-nothing, so a broken indicator can never block an agent.
+nothing instead of failing with "command not found". Set `AGENT_KIND=<agent>`
+so the switcher labels the pane. The script exits 0 and prints nothing, so a
+broken indicator can never block an agent.
 
 | Agent | Integration | working | blocked | ask | done | Status |
 |---|---|:-:|:-:|:-:|:-:|---|

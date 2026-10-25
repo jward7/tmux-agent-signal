@@ -28,7 +28,6 @@ is "an entry naming the wrong session or window is ignored" "$(name "$P_WEB")|$(
 is "an entry without a name sets the kind"         "$(kind "$P_WEB2")" claude
 is "an entry without a name sets no name"          "$(name "$P_WEB2")" ""
 is "sync sets no pane state"                       "$(pst "$P_API")" ""
-is "sync puts both claude panes in the summary"      "$(gsum)" "✳1 ✳2 "
 
 hook "$P_API" UserPromptSubmit   # a single-pane window lists its pane once it has a state
 is "list shows the registry name in the pane row"  "$(HOME=$FAKE "$AS" list | awk -F'\t' -v p="$P_API" '$1 == "P" && $2 == p' | grep -c foo)" 1

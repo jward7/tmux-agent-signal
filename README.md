@@ -26,11 +26,10 @@ and gives you one key to jump to whichever needs you most.
 
 ![agents changing state in the tmux status bar](docs/demo.gif)
 
-Left: how many windows need you, and the agent in the active pane. Middle:
-orange `!` is blocked on a permission, pink `?` is asking a question, green
-`✓` finished while you were elsewhere, `~` is working. Right: one glyph per
-agent with its window number. A green tab turns back to normal the moment you
-look at it.
+Each tab carries its agent's state in front of the name: orange `!` is
+blocked on a permission, pink `?` is asking a question, green `✓` finished
+while you were elsewhere, a dim `~` is working. A green tab turns back to
+normal the moment you look at it. Nothing else on the bar is the plugin's.
 
 ## Why
 
@@ -42,9 +41,10 @@ look at it.
   waited longest. Flag a window as *wait* or *park* to skip it.
 - **Done means done.** A green tab clears itself the moment you look at it,
   and a turn that finishes in front of you never nags.
-- **Plays well with your setup.** The badge is appended to whatever your theme
-  put in `window-status-format`. Tab colours are only touched when the plugin
-  set them, and restored afterwards.
+- **One look, no theme to configure.** The plugin sets the two window-tab
+  formats to `<badge><index>:<name>` and colours a tab only while its agent
+  needs you or has finished. Everything else in your status line is yours,
+  and `uninstall` puts the formats back.
 - **Small and tested.** About 800 lines of POSIX `sh`, and a test suite that
   starts a real tmux server, pipes real hook JSON through the real script and
   asserts on the options. CI runs it on macOS and Ubuntu.
@@ -58,7 +58,7 @@ look at it.
 
 | State     | Badge | Tab colour | Meaning                                              |
 |-----------|-------|------------|------------------------------------------------------|
-| working   | `~`   | unchanged  | agent is running a turn                              |
+| working   | `~`   | unchanged  | agent is running a turn (dim, so it never competes)  |
 | blocked   | `!`   | orange     | a permission prompt is waiting on a keypress          |
 | ask       | `?`   | pink       | a question or plan approval is waiting on an answer   |
 | done      | `✓`   | green      | finished since you last looked at that window        |
@@ -178,21 +178,22 @@ agent-signal set blocked   # the current tab should turn orange
 
 ## Configuration
 
-Every badge, colour, glyph, sound, key and the alert command are options you
-set in `tmux.conf` before the plugin loads. The common ones:
+The badges and colours are fixed. Sounds, notifications, keys, the terminal
+title and the alert command are options you set in `tmux.conf` before the
+plugin loads. The common ones:
 
 ```tmux
 set -g @agent_signal_tab_colour needs   # colour tabs only for blocked and ask
-set -g @agent_signal_ascii on           # + . ? instead of ~ ✓ … for plain fonts
 set -g @agent_signal_sound off
 set -g @agent_signal_notify on          # desktop banner via terminal-notifier / notify-send
 set -g @agent_signal_title on           # "[2 need you]" in the terminal title
 set -g @agent_signal_key_next ''        # unbind a key
 ```
 
-The full list, including per-state colours, fleet glyphs, sounds and a hook
-for running your own command on every state change, is in
-[docs/configuration.md](docs/configuration.md).
+The full list, including sounds and a hook for running your own command on
+every state change, is in [docs/configuration.md](docs/configuration.md).
+The needs-you count is published as `@agent_needs` for your own
+`status-left` or title format.
 
 ## More
 

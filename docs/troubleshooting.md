@@ -12,17 +12,17 @@
   relinked. This plugin looks for the Cellar binary as a fallback, so it keeps
   working until brew deletes the old version, at which point see the next
   item. Wait for brew to finish, or `brew link tmux`.
-- **Icons render as boxes or gaps.** Your font lacks ✓ or …. Set
-  `@agent_signal_ascii on`, or give each state your own icon.
+- **Icons render as boxes or gaps.** Your font lacks ✓ or …. Any font with
+  the Dingbats block (DejaVu, Menlo, Nerd Fonts) has them.
 - **New windows or splits die instantly after a Homebrew tmux upgrade.** The
   new client cannot spawn panes on the old, still-running server. Save with
   resurrect, `tmux kill-server`, start tmux again, and let continuum restore.
 - **The badge does not appear with a theme.** Load this plugin after the
-  theme. The badge is appended to whatever `window-status-format` is set when
-  the plugin loads.
-- **A dead pane's glyph lingers** in the fleet summary on tmux 3.4 (Ubuntu
-  24.04). That tmux only notices a pane has died on its next child exit, so
-  the glyph goes on the next hook or `agent-signal summary`. tmux 3.5 and
-  later fixed this.
+  theme. The plugin sets `window-status-format` when it loads, and a theme
+  loaded later overwrites it.
+- **A dead pane keeps the needs-you count up** on tmux 3.4 (Ubuntu 24.04).
+  That tmux only notices a pane has died on its next child exit, so the count
+  drops on the next hook or `agent-signal needs`. tmux 3.5 and later fixed
+  this.
 - **`next` says nothing needs you** while a tab is orange or pink: the
   window is on `wait` or `park`. `prefix + W` / `prefix + P` clears it.

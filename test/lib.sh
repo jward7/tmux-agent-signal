@@ -43,16 +43,10 @@ wstyle(){ T show-option -wqv -t "$1" window-status-style; }
 whold(){ T show-option -wqv -t "$1" @agent_hold; }
 pst()  { T display -p -t "$1" '#{@agent_pane_state}'; }
 gneeds(){ T show-option -gqv @agent_needs; }
-gsum() { T show-option -gqv @agent_summary | strip; }
 
 # --- actions ---------------------------------------------------------------
 # A whole turn in one pane: a prompt goes in, the agent finishes.
 drive_done() { hook "$1" UserPromptSubmit; hook "$1" Stop; }
-# Single-byte glyphs, so a column count is a column count and not a byte count.
-ascii() { # ascii on|off
-  if [ "$1" = on ]; then T set-option -g @agent_signal_ascii on
-  else T set-option -gu @agent_signal_ascii; fi
-}
 # A real client attached to <session>, on a pseudo-terminal lent by a second,
 # throwaway tmux server: its one pane runs the client, so the bytes a terminal
 # would send (focus reports, keys) go in with send-keys -H. script(1) did this

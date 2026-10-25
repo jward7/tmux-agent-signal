@@ -4,10 +4,9 @@
 Claude hook ──> agent-signal hook Stop ──> tmux set -p @agent_pane_state done
                                         └─> recompute window: @agent_state, @agent_since,
                                             @agent_icon, @agent_fg, window-status-style
-                                        └─> recompute @agent_summary, @agent_needs
+                                        └─> recompute @agent_needs
                                         └─> not on screen? play sound
-window-status-format reads #{@agent_icon} / #{@agent_fg}
-status-right reads #{@agent_summary}
+window-status-format: #{@agent_icon} in #{@agent_fg}, then #I:#W
 after-select-window / client-focus-in hook ──> agent-signal seen <window> ──> done -> idle
 ```
 
@@ -23,8 +22,12 @@ urgent pane. Pane state is stored under `@agent_pane_state`, a different name
 from the window's `@agent_state`, because pane options inherit from the window
 in tmux formats and would otherwise read back the aggregate.
 
-The plugin only ever touches a window's `window-status-style` when it set it,
-tracked with `@agent_tab_owned`, so a style you or a theme put on a window
+The plugin sets the global `window-status-format` and
+`window-status-current-format` when it loads, keeping what was there in
+`@agent_saved_<option>` for `uninstall`. A theme that sets a format on an
+individual window gets the badge put in front of that window's value on its
+next event. It only ever touches a window's `window-status-style` when it set
+it, tracked with `@agent_tab_owned`, so a style you or a theme put on a window
 survives. Key bindings are skipped, with a message, when the key is already
 bound to something else.
 

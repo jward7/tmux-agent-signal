@@ -1,6 +1,6 @@
 #!/bin/sh
 # tmux-agent-signal entry point (sourced by tpm, or via run-shell from tmux.conf).
-# Appends the agent badge to the window-status formats, installs key bindings,
+# Sets the window-status formats to carry the agent badge, installs key bindings,
 # and wires the "viewed -> idle" hooks. Idempotent: safe to source repeatedly.
 set -u
 CURRENT_DIR=$(cd "$(dirname "$0")" && pwd)
@@ -25,16 +25,23 @@ opt_set() { if [ -n "$(t show-options -gq "$1")" ]; then t show-option -gqv "$1"
 #   "$(tmux show -gv @agent_signal_command)" set blocked
 t set-option -g @agent_signal_command "$AS"
 
-# --- status bar badge -------------------------------------------------------
-BADGE=$("$AS" badge-format)   # one definition, in the script
+# --- window tabs: "<badge><index>:<name>" --------------------------------------
+# The plugin owns the two window formats (one definition, in the script). What
+# was there is kept in @agent_saved_<option> so uninstall can put it back.
+FORMAT=$("$AS" window-format)
+OLD_BADGE='#{?#{@agent_icon}, #[fg=#{@agent_fg}#,bold]#{@agent_icon}#[default],}'   # 0.4 appended this
 for o in window-status-format window-status-current-format; do
   cur=$(t show-option -gqv "$o")
-  case $cur in *@agent_icon*) ;; *) t set-option -g "$o" "${cur}${BADGE}" ;; esac
+  case $cur in
+    "$FORMAT") ;;
+    *"$OLD_BADGE") t set-option -g "@agent_saved_$o" "${cur%"$OLD_BADGE"}"; t set-option -g "$o" "$FORMAT" ;;
+    *) t set-option -g "@agent_saved_$o" "$cur"; t set-option -g "$o" "$FORMAT" ;;
+  esac
 done
-
-# --- status-right: one glyph per agent, prepended once ------------------------
+# 0.4 prepended a per-pane glyph summary to status-right; it is gone.
 cur=$(t show-option -gqv status-right)
-case $cur in *@agent_summary*) ;; *) t set-option -g status-right "#{@agent_summary}${cur}" ;; esac
+case $cur in "#{@agent_summary}"*) t set-option -g status-right "${cur#"#{@agent_summary}"}" ;; esac
+t set-option -gu @agent_summary
 
 # --- outer terminal title: "[2 need you] session:window" ---------------------
 if [ "$(opt @agent_signal_title off)" = on ]; then
