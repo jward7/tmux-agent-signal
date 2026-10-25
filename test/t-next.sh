@@ -23,6 +23,13 @@ T set-option -w -t "$W_API" @agent_since 2000000000       # api blocked "later"
 T set-option -w -t "$W_WEB" @agent_since 1000000000       # web has waited longer
 "$AS" next
 is "next serves the longest wait first" "$(T display -p '#{window_id}')" "$W_WEB"
+# A third blocked window, newest of all: repeated presses must visit every
+# window in age order and wrap, not bounce between the two oldest.
+W_C=$(T new-window -d -n c -P -F '#{window_id}'); P_C=$(T list-panes -t "$W_C" -F '#{pane_id}')
+hook "$P_C" PermissionRequest; T set-option -w -t "$W_C" @agent_since 3000000000
+seq=""; for n in 1 2 3 4; do "$AS" next; seq="$seq $(T display -p '#{window_id}')"; done
+is "repeated presses walk the tier oldest to newest and wrap" "$seq" " $W_API $W_C $W_WEB $W_API"
+hook "$P_C" Stop; T kill-window -t "$W_C"
 hook "$P_WEB2" Stop
 hook "$P_API" PreToolUse '{"tool_name":"Bash"}'           # api: working again
 hook "$P_API" PermissionRequest                           # blocked again, fresh stamp

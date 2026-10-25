@@ -21,7 +21,7 @@
 #   agent-signal set <state> [pane]            generic entry for any agent
 #   agent-signal clear [pane]                  agent exited
 #   agent-signal seen [window]                 window viewed: done -> idle (default: current)
-#   agent-signal next                          jump to the next blocked, else ask, else done window
+#   agent-signal next                          jump to the next blocked, else ask, else done window, longest wait first
 #   agent-signal hold wait|park|clear [window] triage a window (default: current); wait/park toggle
 #   agent-signal list                          tree of sessions/windows/panes (for the switcher)
 #   agent-signal sync                          pull names/presence from ~/.claude/sessions
@@ -442,20 +442,19 @@ next() {
   cur=$(current_window)
   # Tab separated, session *id* rather than name: names may contain spaces.
   list=$(t list-windows -a -F '#{window_id}	#{session_id}	#{?@agent_state,#{@agent_state},-}	#{?@agent_hold,#{@agent_hold},-}	#{?@agent_since,#{@agent_since},0}')
-  # rotate so we scan the windows after the current one first
-  after=$(printf '%s\n' "$list" | sed -n "/^$cur	/,\$p" | sed '1d')
-  before=$(printf '%s\n' "$list" | sed "/^$cur	/,\$d")
-  ordered=$(printf '%s\n%s\n' "$after" "$before")
   for want in blocked ask done; do
-    # Within a tier the window that has been waiting longest comes first; the
-    # rotation order breaks ties, so repeated presses still walk the list.
-    target=$(printf '%s\n' "$ordered" | awk -F'	' -v w="$want" '$3==w && $4=="-" {print $5"\t"NR"\t"$1"\t"$2}' \
-      | sort -n -k1,1 -k2,2 | head -1 | cut -f3,4)
-    if [ -n "$target" ]; then
-      t switch-client -t "${target#*	}" 2>/dev/null
-      t select-window -t "${target%%	*}"
-      return 0
-    fi
+    # The tier's windows, longest wait first (window order breaks ties). If the
+    # current window is in that list, continue from the one after it, wrapping,
+    # so repeated presses walk every window rather than bouncing between the
+    # two oldest. Otherwise start from the oldest.
+    tier=$(printf '%s\n' "$list" | awk -F'	' -v w="$want" '$3==w && $4=="-" {print $5"\t"NR"\t"$1"\t"$2}' | sort -n -k1,1 -k2,2 | cut -f3,4)
+    [ -n "$tier" ] || continue
+    after=$(printf '%s\n' "$tier" | sed -n "/^$cur	/,\$p" | sed '1d')
+    before=$(printf '%s\n' "$tier" | sed "/^$cur	/,\$d")
+    target=$(printf '%s\n%s\n' "$after" "$before" | sed -n '/./{p;q;}')
+    t switch-client -t "${target#*	}" 2>/dev/null
+    t select-window -t "${target%%	*}"
+    return 0
   done
   t display-message "agent-signal: nothing needs you"
 }
