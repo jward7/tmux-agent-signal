@@ -1,5 +1,35 @@
 # Changelog
 
+## 0.4.1 (2026-10-25)
+
+Fixes from a review of 0.4.0.
+
+- `next` walked only the two oldest windows in a tier: excluding the current
+  window and taking the oldest made repeated presses bounce A, B, A, B and
+  never reach a third. The tier is now sorted by age once and the scan
+  continues after the current window's place in it, wrapping.
+- The ancestry fallback skips dead panes, whose retained pid a later process
+  could inherit.
+- `AGENT_SIGNAL_DISABLE` now covers every entry point, so a nested Claude's
+  `SessionStart` no longer relabels the parent's pane from Claude's registry;
+  the values `0`, `off` and `false` do not disable.
+- OpenCode v1: the message-id dedupe is back (OpenCode re-publishes the user
+  message after a turn, which stuck the pane on working), `session.error` is
+  no longer a wait (it races `session.idle` on Esc and precedes OpenCode's own
+  compaction on overflow), `question.asked` maps to ask, and `session.created`
+  respects the dedupe.
+- Pi reports done after an aborted turn again: the 0.4.0 rule relied on an
+  inactivity detector this plugin does not have and left Esc on working.
+- The Pi and both OpenCode plugins serialise their reports so an older one
+  cannot land after a newer one.
+- The Codex, Grok, Gemini and Copilot hook commands exit 0 and print nothing
+  outside tmux instead of failing with "command not found".
+- The Claude Code plugin's hooks are registered `async`, as the README said;
+  the manual install already was.
+- Documentation corrections: a missing quote in the configuration block, the
+  comparison table and prose, the troubleshooting colours, the command
+  reference's pane rule, and the changelog's crediting.
+
 ## 0.4.0 (2026-10-25)
 
 The hook and integration items below come from a read of
