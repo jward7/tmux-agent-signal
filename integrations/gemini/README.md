@@ -8,8 +8,9 @@ entries to an existing `hooks` object if you have one).
 |---|---|
 | `SessionStart` | idle |
 | `BeforeAgent`, `AfterTool` | working |
-| `Notification` | blocked |
+| `Notification` matching `ToolPermission` | blocked (other notifications are not a wait) |
 | `AfterAgent` | done |
 | `SessionEnd` | clear |
 
-Written from the Gemini CLI hooks reference; not exercised here.
+Written from the Gemini CLI hooks reference, with the `ToolPermission`
+matcher taken from workmux's shipped Gemini hooks; not exercised here.

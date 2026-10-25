@@ -1,42 +1,65 @@
-// tmux-agent-signal for OpenCode. Copy into ~/.config/opencode/plugins/.
-// Reports one word per lifecycle event to the tmux plugin; every call is
-// fire-and-forget so a broken indicator can never block the agent.
+// tmux-agent-signal for OpenCode (plugin API v1). Copy into
+// ~/.config/opencode/plugins/. Every call is fire-and-forget so a broken
+// indicator can never block the agent.
+//
+// The window's word is derived from the whole family of sessions this
+// process serves, the way workmux's OpenCode plugin does it: a pending
+// permission anywhere is blocked, otherwise a running session is working,
+// otherwise done. A child finishing while its parent runs changes nothing.
 export const TmuxAgentSignal = async ({ $ }) => {
+  // OpenCode's server can outlive and be shared by several terminals; only a
+  // process that knows its own pane may speak for it.
+  if (!process.env.TMUX || !process.env.TMUX_PANE) return {}
   const report = async (word) => {
-    if (!process.env.TMUX) return
     try {
       await $`sh -c ${'AGENT_KIND=opencode exec "$(tmux show -gv @agent_signal_command)" ' + (word === 'clear' ? 'clear' : 'set ' + word)}`.quiet().nothrow()
     } catch {}
   }
-  const children = new Set()          // subagent sessions, whose lifecycle is not the window's
-  const prompted = new Set()          // user message ids already counted as a prompt
+  const sessions = new Map()          // id -> { running, pending: Set<requestID>, errored }
+  const state = (id) => { let s = sessions.get(id); if (!s) { s = { running: false, pending: new Set(), errored: false }; sessions.set(id, s) } return s }
+  let reported
+  const publish = async () => {
+    let word = 'done'
+    for (const s of sessions.values()) {
+      if (s.pending.size || s.errored) { word = 'blocked'; break }
+      if (s.running) word = 'working'
+    }
+    if (word === 'done' && reported === undefined) return   // nothing has run yet
+    if (word === reported) return
+    reported = word
+    await report(word)
+  }
   return {
     event: async ({ event }) => {
       const p = event.properties ?? {}
       switch (event.type) {
         case 'session.created':
-          if (p.info?.parentID) { children.add(p.info.id); return }
-          return report('idle')
+          state(p.info?.id)
+          if (!p.info?.parentID) await report('idle')
+          return
         case 'message.updated': {
           const m = p.info ?? {}
-          if (m.role !== 'user' || children.has(m.sessionID) || prompted.has(m.id)) return
-          prompted.add(m.id); if (prompted.size > 200) prompted.delete(prompted.values().next().value)
-          return report('working')
+          if (m.role !== 'user') return
+          const s = state(m.sessionID); s.running = true; s.errored = false
+          return publish()
         }
-        case 'tool.execute.after':
-        case 'permission.replied':
-          return report('working')
         case 'permission.asked':
-          return report('blocked')
+          state(p.sessionID).pending.add(p.id)
+          return publish()
+        case 'permission.replied':
+          state(p.sessionID).pending.delete(p.requestID)
+          return publish()
         case 'session.error':
-          if (children.has(p.sessionID)) return
-          return report('blocked')
-        case 'session.idle':
-          if (children.has(p.sessionID)) return
-          return report('done')
+          state(p.sessionID).errored = true
+          return publish()
+        case 'session.idle': {
+          const s = state(p.sessionID); s.running = false; s.pending.clear(); s.errored = false
+          return publish()
+        }
         case 'session.deleted':
-          if (children.delete(p.info?.id)) return
-          return report('clear')
+          sessions.delete(p.info?.id)
+          if (sessions.size === 0) { reported = undefined; return report('clear') }
+          return publish()
       }
     },
   }

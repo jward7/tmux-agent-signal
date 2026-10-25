@@ -18,7 +18,7 @@ nothing, so a broken indicator can never block an agent.
 | [Codex CLI](codex/) | hooks in `hooks.json` (`[features] hooks = true`) | yes | yes | | yes | from the docs, not exercised here |
 | [Gemini CLI](gemini/) | hooks in `settings.json` | yes | yes | | yes | from the docs, not exercised here |
 | [Copilot CLI](copilot/) | hooks file | yes | yes | | yes | from the docs, not exercised here |
-| [OpenCode](opencode/) | plugin | yes | yes | | yes | from the docs, not exercised here |
+| [OpenCode](opencode/) | plugin (API v1 or v2) | yes | yes | | yes | from the docs, not exercised here |
 | [Pi](pi/) | extension | yes | | yes | yes | from the docs, not exercised here |
 
 "From the docs" means the mapping was written against the vendor's published

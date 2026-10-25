@@ -2,6 +2,11 @@
 
 ## Unreleased
 
+- Integrations refreshed against workmux's, which its users run: Gemini's
+  `Notification` hook matches only `ToolPermission`; Pi does not report done
+  after an aborted turn it will continue from; OpenCode derives the word from
+  every session it serves and gains a plugin API v2 (TUI) variant. All stay
+  silent without `TMUX_PANE`.
 - Codex CLI integration rewritten on Codex's hooks (`[features] hooks = true`):
   working, blocked and done instead of done only, with subagent events kept
   as working so a child finishing does not mark the turn done.
