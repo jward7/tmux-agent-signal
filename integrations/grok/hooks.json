@@ -1,0 +1,10 @@
+{
+  "hooks": {
+    "SessionStart":     [{ "hooks": [{ "type": "command", "command": "AGENT_KIND=grok \"$(tmux show -gv @agent_signal_command)\" set idle" }] }],
+    "UserPromptSubmit": [{ "hooks": [{ "type": "command", "command": "AGENT_KIND=grok \"$(tmux show -gv @agent_signal_command)\" set working" }] }],
+    "PostToolUse":      [{ "hooks": [{ "type": "command", "command": "AGENT_KIND=grok \"$(tmux show -gv @agent_signal_command)\" set working" }] }],
+    "Notification":     [{ "hooks": [{ "type": "command", "command": "AGENT_KIND=grok \"$(tmux show -gv @agent_signal_command)\" set blocked" }] }],
+    "Stop":             [{ "hooks": [{ "type": "command", "command": "AGENT_KIND=grok \"$(tmux show -gv @agent_signal_command)\" set done" }] }],
+    "SessionEnd":       [{ "hooks": [{ "type": "command", "command": "\"$(tmux show -gv @agent_signal_command)\" clear" }] }]
+  }
+}
