@@ -29,7 +29,10 @@ The plugin sets the global `window-status-format` and
 `pane-border-style` and `pane-active-border-style` that colours a pane's
 border by its own `@agent_pane_state`. tmux expands border styles against
 the pane that owns the border cell, so no per-pane option is needed and it
-works from tmux 3.2. A theme that sets a format on an individual window gets
+works from tmux 3.2. tmux credits a shared border to the first adjacent pane
+in its list, preferring the active one, so this is only dependable with two
+panes, where each pane owns half the shared line. With more panes `next`
+selects the pane instead. A theme that sets a format on an individual window gets
 the badge put in front of that window's value on its next event. It only ever touches a window's `window-status-style` when it set
 it, tracked with `@agent_tab_owned`, so a style you or a theme put on a window
 survives. Key bindings are skipped, with a message, when the key is already

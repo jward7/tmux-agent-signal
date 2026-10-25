@@ -29,8 +29,9 @@ and gives you one key to jump to whichever needs you most.
 Each tab carries its agent's state in front of the name: orange `!` is
 blocked on a permission, pink `?` is asking a question, green `✓` finished
 while you were elsewhere, a dim `~` is working. A green tab turns back to
-normal the moment you look at it. In a split window the pane that needs you
-gets a border in the same colour. Nothing else on the bar is the plugin's.
+normal the moment you look at it. In a two-pane window the pane that needs
+you gets its half of the border in the same colour, and `prefix + N` lands in
+that pane. Nothing else on the bar is the plugin's.
 
 ## Why
 
@@ -44,7 +45,8 @@ gets a border in the same colour. Nothing else on the bar is the plugin's.
   and a turn that finishes in front of you never nags.
 - **One look, no theme to configure.** The plugin sets the two window-tab
   formats to `<badge><index>:<name>`, colours a tab only while its agent
-  needs you or has finished, and colours a split pane's border the same way.
+  needs you or has finished, and in a two-pane window colours that pane's
+  border the same way.
   Everything else in your status line and your border styles is yours, and
   `uninstall` puts it all back.
 - **Small and tested.** About 800 lines of POSIX `sh`, and a test suite that
@@ -91,7 +93,7 @@ All `prefix +`, all configurable.
 
 | Key | Action |
 |-----|--------|
-| `N` | go to the next blocked window, else ask, else done; within a tier, the one that has waited longest |
+| `N` | go to the next blocked window, else ask, else done; within a tier, the one that has waited longest; in a split window, into the pane that needs you |
 | `A` | switcher popup: sessions > windows > panes with state (needs fzf) |
 | `W` | toggle **wait** on the current window |
 | `P` | toggle **park** on the current window |

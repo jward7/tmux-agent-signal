@@ -9,6 +9,7 @@ hook "$P_API" Stop                                   # api: done (detached serve
 hook "$P_WEB2" PermissionRequest                     # web: blocked
 "$AS" next
 is "next jumps to the blocked window" "$(T display -p '#{window_id}')" "$W_WEB"
+is "and lands in the blocked pane, not the window's active one" "$(T display -p '#{pane_id}')" "$P_WEB2"
 hook "$P_WEB2" Stop; T select-window -t "$W_API"; waitfor "$W_API" ""
 "$AS" hold park "$W_WEB"
 "$AS" next

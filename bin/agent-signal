@@ -339,17 +339,6 @@ EOF2
     esac
   fi
   refresh_needs
-  redraw_borders "$win"
-}
-
-# Border styles read @agent_pane_state at draw time, but setting a user option
-# does not make tmux redraw, so a split window's borders would keep their old
-# colour until the next layout change. Redraw the clients showing the window.
-redraw_borders() { # redraw_borders <window>
-  [ "$(t display -p -t "$1" '#{window_panes}')" -gt 1 ] || return 0
-  t list-clients -F '#{client_name}	#{client_session}' | while IFS='	' read -r c s; do
-    t list-windows -t "$s" -F '#{window_id}' | grep -qx "$1" && t refresh-client -t "$c"
-  done
 }
 
 refresh_needs() { # count of windows needing you (blocked or ask), for titles and your own status line
@@ -470,6 +459,11 @@ next() {
     target=$(printf '%s\n%s\n' "$after" "$before" | sed -n '/./{p;q;}')
     t switch-client -t "${target#*	}" 2>/dev/null
     t select-window -t "${target%%	*}"
+    # In a split window, land in the pane that needs you (the most urgent,
+    # by pane order), not wherever the cursor last was.
+    pane=$(t list-panes -t "${target%%	*}" -F '#{pane_id}	#{?@agent_pane_state,#{@agent_pane_state},-}' \
+      | awk -F'	' -v w="$want" '$2==w {print $1; exit}')
+    [ -n "$pane" ] && t select-pane -t "$pane"
     return 0
   done
   t display-message "agent-signal: nothing needs you"

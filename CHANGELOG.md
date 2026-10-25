@@ -2,11 +2,14 @@
 
 ## Unreleased
 
-- **Pane borders.** In a split window, the pane whose agent is blocked,
-  asking or done gets a border in the tab's colour. The plugin appends a
-  conditional on `@agent_pane_state` to `pane-border-style` and
+- **Pane borders.** In a two-pane window, the pane whose agent is blocked,
+  asking or done gets its half of the border in the tab's colour. The plugin
+  appends a conditional on `@agent_pane_state` to `pane-border-style` and
   `pane-active-border-style`, leaving your own style as the base; `uninstall`
-  restores both.
+  restores both. tmux credits shared borders to the first adjacent pane, so
+  with more panes the colour is not dependable.
+- **`next` lands in the pane.** In a split window `prefix + N` now selects
+  the pane that needs you, not wherever the cursor last was.
 - **One look.** The badge now sits in front of the window name (`!3:web`)
   so it reads as part of that tab, and tmux's own window flag is dropped
   while a badge shows (the `*` on the current tab used to hide it). Working
