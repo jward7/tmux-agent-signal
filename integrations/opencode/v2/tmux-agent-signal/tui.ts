@@ -12,10 +12,15 @@ import { Plugin } from '@opencode/plugin/tui';
 
 type State = { running: boolean; pending: Set<string> };
 
+// Reports are serialised so an older one can never land after a newer one.
+let queue: Promise<void> = Promise.resolve();
 const report = (word: string) => {
-  if (!process.env.TMUX || !process.env.TMUX_PANE) return;
+  if (!process.env.TMUX || !process.env.TMUX_PANE) return queue;
   const args = word === 'clear' ? ['clear'] : ['set', word];
-  execFile('sh', ['-c', 'AGENT_KIND=opencode exec "$(tmux show -gv @agent_signal_command)" "$@"', 'sh', ...args], () => {});
+  queue = queue.then(() => new Promise<void>((done) => {
+    execFile('sh', ['-c', 'AGENT_KIND=opencode exec "$(tmux show -gv @agent_signal_command)" "$@"', 'sh', ...args], () => done());
+  }));
+  return queue;
 };
 
 export default Plugin.define({

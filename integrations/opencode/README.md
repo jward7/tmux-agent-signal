@@ -22,13 +22,17 @@ Headless `opencode run` is not tracked.
 |---|---|
 | `session.created` (no parent) | idle |
 | `message.updated` (a user message) | working |
-| `permission.asked`, `session.error` | blocked |
-| `permission.replied`, `session.idle` | recomputed |
+| `permission.asked` | blocked |
+| `question.asked` | ask |
+| `permission.replied`, `question.replied`, `session.idle` | recomputed |
 | `session.deleted` (last session) | clear |
 
 In both, the word is computed over every session the process serves, root and
-subagents alike: a pending permission anywhere is blocked, otherwise a running
-session is working, otherwise done. A subagent finishing while its parent runs
+subagents alike: a pending permission anywhere is blocked, a pending question
+is ask, otherwise a running session is working, otherwise done. `session.error`
+is deliberately not a wait: an Esc or an error is followed by `session.idle`,
+and a context overflow by OpenCode's own compaction. Reports are serialised so
+an older one never lands after a newer one. A subagent finishing while its parent runs
 changes nothing. The plugins stay silent unless `TMUX_PANE` is set, because
 OpenCode's server can be shared by several terminals and only a process that
 knows its own pane may speak for it.

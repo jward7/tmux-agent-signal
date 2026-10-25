@@ -18,7 +18,7 @@ nothing, so a broken indicator can never block an agent.
 | [Codex CLI](codex/) | hooks in `hooks.json` (`[features] hooks = true`) | yes | yes | | yes | from the docs, not exercised here |
 | [Gemini CLI](gemini/) | hooks in `settings.json` | yes | yes | | yes | from the docs, not exercised here |
 | [Copilot CLI](copilot/) | hooks file | yes | yes | | yes | from the docs, not exercised here |
-| [OpenCode](opencode/) | plugin (API v1 or v2) | yes | yes | | yes | from the docs, not exercised here |
+| [OpenCode](opencode/) | plugin (API v1 or v2) | yes | yes | v1 | yes | from the docs, not exercised here |
 | [Pi](pi/) | extension | yes | | yes | yes | from the docs, not exercised here |
 | [Grok CLI](grok/) | hooks file | yes | yes | | yes | from workmux's hooks, not exercised here |
 | [Antigravity CLI](antigravity/) | hooks in `~/.gemini/config/hooks.json` | yes | | | yes | from workmux's hooks, not exercised here |
