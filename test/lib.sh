@@ -65,13 +65,18 @@ attach_client() { # attach_client <session>
   exec 3<>"$FIFO"
   CLIENT_PIDS=
   if script --version 2>/dev/null | grep -q util-linux; then
-    TERM=xterm-256color script -qfec "tmux -L $SOCK attach -t $1" /dev/null <"$FIFO" >/dev/null 2>&1 &
+    TERM=xterm-256color script -qfec "tmux -L $SOCK attach -t $1" /dev/null <"$FIFO" >"$TMPDIR/client-log" 2>&1 &
   else
-    TERM=xterm-256color script -q /dev/null tmux -L "$SOCK" attach -t "$1" <"$FIFO" >/dev/null 2>&1 &
+    TERM=xterm-256color script -q /dev/null tmux -L "$SOCK" attach -t "$1" <"$FIFO" >"$TMPDIR/client-log" 2>&1 &
   fi
   CLIENT_PIDS="$CLIENT_PIDS $!"
   i=0; while [ -z "$(T list-clients)" ] && [ $i -lt 100 ]; do sleep 0.05; i=$((i + 1)); done
-  [ -n "$(T list-clients)" ] || bad "attach_client: a client attached within 5s" "none" "one"
+  [ -n "$(T list-clients)" ] && return 0
+  # Show what the client wrote on its way out: script and tmux both explain
+  # themselves there, and a CI runner has no other terminal to look at.
+  bad "attach_client: a client attached within 5s" "none" "one"
+  printf "       client said: [%s]\n" "$(tr -d "\033" <"$TMPDIR/client-log" | tr -s "\r\n" "  " | cut -c1-300)"
+  printf "       script is: [%s]\n" "$(command -v script) $(script --version 2>&1 | head -1)"
 }
 # Send the terminal's focus report (CSI I / CSI O) and wait until tmux has
 # taken it in. Needs focus-events on.
