@@ -9,7 +9,7 @@ setup
 drive_done "$P_API"
 T select-window -t "$W_API"; waitfor "$W_API" ""
 is "viewing a done window clears it (after-select-window hook)" "$(wst "$W_API")" ""
-is "all three seen hooks name their own window" "$(T show-hooks -g | grep -c 'seen #{window_id}')" 3
+is "all four seen hooks name their own window" "$(T show-hooks -g | grep -c 'seen #{window_id}')" 4
 hook "$P_WEB" Stop
 "$AS" seen "$W_WEB"
 is "seen with an explicit window clears that window" "$(wst "$W_WEB")" ""

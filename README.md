@@ -30,6 +30,10 @@ same few words.
 
 `done` flips to idle automatically when you view the window. If a turn
 finishes in the window you are already looking at, it never shows `done`.
+"Looking at" means the window is shown in a focused terminal: with one
+session per terminal tab, a finish in a background tab still shows `done`,
+and focusing that tab clears it (needs `focus-events on`; a terminal that
+never reports focus counts as always focused).
 A window with several agent panes shows the most urgent one
 (blocked > ask > done > working). blocked and ask always show through a wait
 or park.
@@ -362,7 +366,7 @@ Claude hook ──> agent-signal hook Stop ──> tmux set -p @agent_pane_state
                                         └─> not on screen? play sound
 window-status-format reads #{@agent_icon} / #{@agent_fg}
 status-right reads #{@agent_summary}
-after-select-window hook ──> agent-signal seen <window> ──> done -> idle
+after-select-window / client-focus-in hook ──> agent-signal seen <window> ──> done -> idle
 ```
 
 Claude runs hooks concurrently, so each update takes a lock keyed on the
