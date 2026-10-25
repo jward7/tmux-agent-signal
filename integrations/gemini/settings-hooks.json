@@ -1,10 +1,10 @@
 {
   "hooks": {
-    "SessionStart": [{ "hooks": [{ "type": "command", "name": "tmux-agent-signal", "command": "AGENT_KIND=gemini \"$(tmux show -gv @agent_signal_command)\" set idle" }] }],
-    "BeforeAgent":  [{ "hooks": [{ "type": "command", "name": "tmux-agent-signal", "command": "AGENT_KIND=gemini \"$(tmux show -gv @agent_signal_command)\" set working" }] }],
-    "AfterTool":    [{ "hooks": [{ "type": "command", "name": "tmux-agent-signal", "command": "AGENT_KIND=gemini \"$(tmux show -gv @agent_signal_command)\" set working" }] }],
-    "Notification": [{ "matcher": "ToolPermission", "hooks": [{ "type": "command", "name": "tmux-agent-signal", "command": "AGENT_KIND=gemini \"$(tmux show -gv @agent_signal_command)\" set blocked" }] }],
-    "AfterAgent":   [{ "hooks": [{ "type": "command", "name": "tmux-agent-signal", "command": "AGENT_KIND=gemini \"$(tmux show -gv @agent_signal_command)\" set done" }] }],
-    "SessionEnd":   [{ "hooks": [{ "type": "command", "name": "tmux-agent-signal", "command": "\"$(tmux show -gv @agent_signal_command)\" clear" }] }]
+    "SessionStart": [{ "hooks": [{ "type": "command", "name": "tmux-agent-signal", "command": "c=$(tmux show -gv @agent_signal_command 2>/dev/null) && [ -n \"$c\" ] && AGENT_KIND=gemini \"$c\" set idle; exit 0" }] }],
+    "BeforeAgent":  [{ "hooks": [{ "type": "command", "name": "tmux-agent-signal", "command": "c=$(tmux show -gv @agent_signal_command 2>/dev/null) && [ -n \"$c\" ] && AGENT_KIND=gemini \"$c\" set working; exit 0" }] }],
+    "AfterTool":    [{ "hooks": [{ "type": "command", "name": "tmux-agent-signal", "command": "c=$(tmux show -gv @agent_signal_command 2>/dev/null) && [ -n \"$c\" ] && AGENT_KIND=gemini \"$c\" set working; exit 0" }] }],
+    "Notification": [{ "matcher": "ToolPermission", "hooks": [{ "type": "command", "name": "tmux-agent-signal", "command": "c=$(tmux show -gv @agent_signal_command 2>/dev/null) && [ -n \"$c\" ] && AGENT_KIND=gemini \"$c\" set blocked; exit 0" }] }],
+    "AfterAgent":   [{ "hooks": [{ "type": "command", "name": "tmux-agent-signal", "command": "c=$(tmux show -gv @agent_signal_command 2>/dev/null) && [ -n \"$c\" ] && AGENT_KIND=gemini \"$c\" set done; exit 0" }] }],
+    "SessionEnd":   [{ "hooks": [{ "type": "command", "name": "tmux-agent-signal", "command": "c=$(tmux show -gv @agent_signal_command 2>/dev/null) && [ -n \"$c\" ] && \"$c\" clear; exit 0" }] }]
   }
 }

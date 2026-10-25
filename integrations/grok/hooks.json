@@ -1,10 +1,10 @@
 {
   "hooks": {
-    "SessionStart":     [{ "hooks": [{ "type": "command", "command": "AGENT_KIND=grok \"$(tmux show -gv @agent_signal_command)\" set idle" }] }],
-    "UserPromptSubmit": [{ "hooks": [{ "type": "command", "command": "AGENT_KIND=grok \"$(tmux show -gv @agent_signal_command)\" set working" }] }],
-    "PostToolUse":      [{ "hooks": [{ "type": "command", "command": "AGENT_KIND=grok \"$(tmux show -gv @agent_signal_command)\" set working" }] }],
-    "Notification":     [{ "hooks": [{ "type": "command", "command": "AGENT_KIND=grok \"$(tmux show -gv @agent_signal_command)\" set blocked" }] }],
-    "Stop":             [{ "hooks": [{ "type": "command", "command": "AGENT_KIND=grok \"$(tmux show -gv @agent_signal_command)\" set done" }] }],
-    "SessionEnd":       [{ "hooks": [{ "type": "command", "command": "\"$(tmux show -gv @agent_signal_command)\" clear" }] }]
+    "SessionStart":     [{ "hooks": [{ "type": "command", "command": "c=$(tmux show -gv @agent_signal_command 2>/dev/null) && [ -n \"$c\" ] && AGENT_KIND=grok \"$c\" set idle; exit 0" }] }],
+    "UserPromptSubmit": [{ "hooks": [{ "type": "command", "command": "c=$(tmux show -gv @agent_signal_command 2>/dev/null) && [ -n \"$c\" ] && AGENT_KIND=grok \"$c\" set working; exit 0" }] }],
+    "PostToolUse":      [{ "hooks": [{ "type": "command", "command": "c=$(tmux show -gv @agent_signal_command 2>/dev/null) && [ -n \"$c\" ] && AGENT_KIND=grok \"$c\" set working; exit 0" }] }],
+    "Notification":     [{ "hooks": [{ "type": "command", "command": "c=$(tmux show -gv @agent_signal_command 2>/dev/null) && [ -n \"$c\" ] && AGENT_KIND=grok \"$c\" set blocked; exit 0" }] }],
+    "Stop":             [{ "hooks": [{ "type": "command", "command": "c=$(tmux show -gv @agent_signal_command 2>/dev/null) && [ -n \"$c\" ] && AGENT_KIND=grok \"$c\" set done; exit 0" }] }],
+    "SessionEnd":       [{ "hooks": [{ "type": "command", "command": "c=$(tmux show -gv @agent_signal_command 2>/dev/null) && [ -n \"$c\" ] && \"$c\" clear; exit 0" }] }]
   }
 }

@@ -8,7 +8,14 @@ The plugin's whole interface for an agent is one command with one word:
 ```
 
 The entry file publishes the script's location as `@agent_signal_command`, so
-nothing here hard-codes a path. Set `AGENT_KIND=<agent>` so the switcher and
+nothing here hard-codes a path. The hook files look it up with a guard,
+
+```sh
+c=$(tmux show -gv @agent_signal_command 2>/dev/null) && [ -n "$c" ] && AGENT_KIND=codex "$c" set working; exit 0
+```
+
+so that outside tmux, or with tmux off PATH, the hook exits 0 and prints
+nothing instead of failing with "command not found". Set `AGENT_KIND=<agent>` so the switcher and
 the status-right summary label the pane. The script exits 0 and prints
 nothing, so a broken indicator can never block an agent.
 

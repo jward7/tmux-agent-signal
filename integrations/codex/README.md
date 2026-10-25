@@ -26,7 +26,7 @@ the pane is labelled when the first prompt goes in. Codex does not fire a
 If your Codex predates hooks, the older `notify` setting still gives you done:
 
 ```toml
-notify = ["sh", "-c", "AGENT_KIND=codex \"$(tmux show -gv @agent_signal_command)\" set done"]
+notify = ["sh", "-c", "c=$(tmux show -gv @agent_signal_command 2>/dev/null) && [ -n \"$c\" ] && AGENT_KIND=codex \"$c\" set done; exit 0"]
 ```
 
 Written from the Codex hooks reference and workmux's shipped Codex hooks,

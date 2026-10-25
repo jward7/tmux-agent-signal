@@ -1,11 +1,11 @@
 {
   "hooks": {
-    "SessionStart":      [{ "matcher": "startup|resume|clear", "hooks": [{ "type": "command", "command": "AGENT_KIND=codex \"$(tmux show -gv @agent_signal_command)\" set idle" }] }],
-    "UserPromptSubmit":  [{ "hooks": [{ "type": "command", "command": "AGENT_KIND=codex \"$(tmux show -gv @agent_signal_command)\" set working" }] }],
-    "PostToolUse":       [{ "hooks": [{ "type": "command", "command": "AGENT_KIND=codex \"$(tmux show -gv @agent_signal_command)\" set working" }] }],
-    "SubagentStart":     [{ "hooks": [{ "type": "command", "command": "AGENT_KIND=codex \"$(tmux show -gv @agent_signal_command)\" set working" }] }],
-    "SubagentStop":      [{ "hooks": [{ "type": "command", "command": "AGENT_KIND=codex \"$(tmux show -gv @agent_signal_command)\" set working" }] }],
-    "PermissionRequest": [{ "hooks": [{ "type": "command", "command": "AGENT_KIND=codex \"$(tmux show -gv @agent_signal_command)\" set blocked" }] }],
-    "Stop":              [{ "hooks": [{ "type": "command", "command": "AGENT_KIND=codex \"$(tmux show -gv @agent_signal_command)\" set done" }] }]
+    "SessionStart":      [{ "matcher": "startup|resume|clear", "hooks": [{ "type": "command", "command": "c=$(tmux show -gv @agent_signal_command 2>/dev/null) && [ -n \"$c\" ] && AGENT_KIND=codex \"$c\" set idle; exit 0" }] }],
+    "UserPromptSubmit":  [{ "hooks": [{ "type": "command", "command": "c=$(tmux show -gv @agent_signal_command 2>/dev/null) && [ -n \"$c\" ] && AGENT_KIND=codex \"$c\" set working; exit 0" }] }],
+    "PostToolUse":       [{ "hooks": [{ "type": "command", "command": "c=$(tmux show -gv @agent_signal_command 2>/dev/null) && [ -n \"$c\" ] && AGENT_KIND=codex \"$c\" set working; exit 0" }] }],
+    "SubagentStart":     [{ "hooks": [{ "type": "command", "command": "c=$(tmux show -gv @agent_signal_command 2>/dev/null) && [ -n \"$c\" ] && AGENT_KIND=codex \"$c\" set working; exit 0" }] }],
+    "SubagentStop":      [{ "hooks": [{ "type": "command", "command": "c=$(tmux show -gv @agent_signal_command 2>/dev/null) && [ -n \"$c\" ] && AGENT_KIND=codex \"$c\" set working; exit 0" }] }],
+    "PermissionRequest": [{ "hooks": [{ "type": "command", "command": "c=$(tmux show -gv @agent_signal_command 2>/dev/null) && [ -n \"$c\" ] && AGENT_KIND=codex \"$c\" set blocked; exit 0" }] }],
+    "Stop":              [{ "hooks": [{ "type": "command", "command": "c=$(tmux show -gv @agent_signal_command 2>/dev/null) && [ -n \"$c\" ] && AGENT_KIND=codex \"$c\" set done; exit 0" }] }]
   }
 }
