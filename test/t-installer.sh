@@ -32,5 +32,6 @@ is "plugin hooks skip compaction for SessionStart" "$(jq -r '.hooks.SessionStart
 is "docs hooks skip compaction for SessionStart"   "$(jq -r '.hooks.SessionStart[0].matcher' "$ROOT/docs/claude-hooks.json")" "startup|resume|clear|fork"
 is "plugin hooks locate the script via CLAUDE_PLUGIN_ROOT" "$(jq -r '.hooks[][].hooks[].command' "$ROOT/hooks/hooks.json" | grep -vc CLAUDE_PLUGIN_ROOT)" 0
 is "plugin manifest version matches the script"        "$(jq -r .version "$ROOT/.claude-plugin/plugin.json")" "$(TMUX='' "$AS" version)"
+is "marketplace entry version matches the script"      "$(jq -r '.plugins[0].version' "$ROOT/.claude-plugin/marketplace.json")" "$(TMUX='' "$AS" version)"
 
 finish
