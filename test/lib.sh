@@ -9,8 +9,9 @@
 # By default no client is attached to that server, so no window is "visible"
 # to the plugin and done always shows. The auto-acknowledge branch -- finishing
 # in a window you are already looking at clears the flag instead of raising
-# it -- needs a client: attach_client gives one on a pseudo-terminal, and
-# focus in|out drives its focus the way a terminal reports it (t-focus.sh).
+# it -- needs a client: attach_client gives one on a pseudo-terminal lent by a
+# second tmux server, and focus in|out drives its focus the way a terminal
+# reports it (t-focus.sh).
 set -u
 
 ROOT=$(cd "$(dirname "$0")/.." && pwd)
@@ -52,36 +53,24 @@ ascii() { # ascii on|off
   if [ "$1" = on ]; then T set-option -g @agent_signal_ascii on
   else T set-option -gu @agent_signal_ascii; fi
 }
-# A real client attached to <session>, on a pseudo-terminal made by script(1),
-# reading its terminal input from a FIFO so tests can type into it. Sets
-# CLIENT_PIDS for cleanup. util-linux and BSD script take different arguments.
+# A real client attached to <session>, on a pseudo-terminal lent by a second,
+# throwaway tmux server: its one pane runs the client, so the bytes a terminal
+# would send (focus reports, keys) go in with send-keys -H. script(1) did this
+# job before, but BSD script refuses a FIFO for stdin on newer macOS.
 attach_client() { # attach_client <session>
-  FIFO="$TMPDIR/client-input"
-  mkfifo "$FIFO"
-  # Hold the FIFO open read-write from this process: the client's terminal
-  # never sees end of input, and a write to it never blocks waiting for a
-  # reader, so a client that failed to start fails the test instead of
-  # hanging it (BSD script on a CI runner with no terminal did exactly that).
-  exec 3<>"$FIFO"
-  CLIENT_PIDS=
-  if script --version 2>/dev/null | grep -q util-linux; then
-    TERM=xterm-256color script -qfec "tmux -L $SOCK attach -t $1" /dev/null <"$FIFO" >"$TMPDIR/client-log" 2>&1 &
-  else
-    TERM=xterm-256color script -q /dev/null tmux -L "$SOCK" attach -t "$1" <"$FIFO" >"$TMPDIR/client-log" 2>&1 &
-  fi
-  CLIENT_PIDS="$CLIENT_PIDS $!"
+  TERM_SOCK="$SOCK-term"
+  tmux -L "$TERM_SOCK" -f /dev/null new-session -d -x 120 -y 30 \
+    "TERM=xterm-256color exec tmux -L '$SOCK' attach -t '$1'" >"$TMPDIR/client-log" 2>&1
   i=0; while [ -z "$(T list-clients)" ] && [ $i -lt 100 ]; do sleep 0.05; i=$((i + 1)); done
   [ -n "$(T list-clients)" ] && return 0
-  # Show what the client wrote on its way out: script and tmux both explain
-  # themselves there, and a CI runner has no other terminal to look at.
   bad "attach_client: a client attached within 5s" "none" "one"
-  printf "       client said: [%s]\n" "$(tr -d "\033" <"$TMPDIR/client-log" | tr -s "\r\n" "  " | cut -c1-300)"
-  printf "       script is: [%s]\n" "$(command -v script) $(script --version 2>&1 | head -1)"
+  printf '       terminal server said: [%s]\n' "$(tr -s '\r\n' '  ' <"$TMPDIR/client-log" | cut -c1-300)"
 }
 # Send the terminal's focus report (CSI I / CSI O) and wait until tmux has
 # taken it in. Needs focus-events on.
 focus() { # focus in|out
-  if [ "$1" = in ]; then printf '\033[I' >&3; want=yes; else printf '\033[O' >&3; want=no; fi
+  if [ "$1" = in ]; then tmux -L "$TERM_SOCK" send-keys -H 1b 5b 49; want=yes
+  else tmux -L "$TERM_SOCK" send-keys -H 1b 5b 4f; want=no; fi
   i=0
   while [ $i -lt 100 ]; do
     case ",$(T list-clients -F '#{client_flags}')," in *,focused,*) got=yes ;; *) got=no ;; esac
@@ -104,8 +93,7 @@ cleanup() {
   [ "$_cleaned" = 0 ] || return 0
   _cleaned=1
   [ "${KEEP:-}" != 1 ] || return 0
-  # shellcheck disable=SC2086  # a list of pids, split on purpose
-  [ -z "${CLIENT_PIDS:-}" ] || kill $CLIENT_PIDS 2>/dev/null
+  [ -z "${TERM_SOCK:-}" ] || { tmux -L "$TERM_SOCK" kill-server 2>/dev/null; rm -f "${SOCK_PATH}-term"; }
   T kill-server 2>/dev/null
   # tmux leaves the socket file behind, and this name is used once ever.
   rm -f "$SOCK_PATH"

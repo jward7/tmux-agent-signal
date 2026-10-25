@@ -5,9 +5,11 @@
 - The per-window lock key no longer needs `cksum` or `cut` on PATH: the server
   socket path is flattened in plain shell. A hook run from a trimmed PATH used
   to print "cksum: command not found" and key every server's locks the same.
-- `attach_client` in `test/lib.sh` holds its FIFO open read-write, so a client
-  that fails to start fails `t-focus.sh` instead of hanging it, which the
-  macOS CI runner did.
+- `attach_client` in `test/lib.sh` borrows a pseudo-terminal from a second,
+  throwaway tmux server instead of `script(1)`, and feeds it focus reports with
+  `send-keys -H`. BSD `script` on the macOS CI runner refused the FIFO it was
+  given for stdin and the first write then hung `t-focus.sh`; a client that
+  fails to attach is now a failed assertion with the terminal server's output.
 - "On screen" now needs a focused client showing the window, not just an
   attached session. With one session per terminal tab every session is
   attached, so a turn finishing in a background tab went straight to idle
