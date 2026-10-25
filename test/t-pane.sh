@@ -1,4 +1,5 @@
 #!/bin/sh
+# shellcheck disable=SC1010  # bare "done" here is a state name, not a loop keyword
 # Which pane a report lands in when the caller does not say.
 # shellcheck source-path=SCRIPTDIR source=./lib.sh
 . "$(dirname "$0")/lib.sh"
@@ -21,6 +22,6 @@ is "an explicit pane argument wins"                           "$(wst "$W_WEB")" 
 is "and the caller's own pane is untouched"                   "$(wst "$W_API")" working
 
 # Outside any pane's process tree the active pane is the last resort.
-is "no ancestry: falls back to the active pane" "$(TMUX_PANE= "$AS" set done >/dev/null 2>&1; wst "$(T display -p '#{window_id}')")" done
+is "no ancestry: falls back to the active pane" "$(TMUX_PANE='' "$AS" set done >/dev/null 2>&1; wst "$(T display -p '#{window_id}')")" done
 
 finish
