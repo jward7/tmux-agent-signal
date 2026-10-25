@@ -7,6 +7,7 @@ Claude hook ──> agent-signal hook Stop ──> tmux set -p @agent_pane_state
                                         └─> recompute @agent_needs
                                         └─> not on screen? play sound
 window-status-format: #{@agent_icon} in #{@agent_fg}, then #I:#W
+pane-border-style: your style, then fg=orange/pink/green by #{@agent_pane_state}
 after-select-window / client-focus-in hook ──> agent-signal seen <window> ──> done -> idle
 ```
 
@@ -24,9 +25,12 @@ in tmux formats and would otherwise read back the aggregate.
 
 The plugin sets the global `window-status-format` and
 `window-status-current-format` when it loads, keeping what was there in
-`@agent_saved_<option>` for `uninstall`. A theme that sets a format on an
-individual window gets the badge put in front of that window's value on its
-next event. It only ever touches a window's `window-status-style` when it set
+`@agent_saved_<option>` for `uninstall`, and appends a conditional to
+`pane-border-style` and `pane-active-border-style` that colours a pane's
+border by its own `@agent_pane_state`. tmux expands border styles against
+the pane that owns the border cell, so no per-pane option is needed and it
+works from tmux 3.2. A theme that sets a format on an individual window gets
+the badge put in front of that window's value on its next event. It only ever touches a window's `window-status-style` when it set
 it, tracked with `@agent_tab_owned`, so a style you or a theme put on a window
 survives. Key bindings are skipped, with a message, when the key is already
 bound to something else.

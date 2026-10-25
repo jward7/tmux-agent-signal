@@ -38,6 +38,13 @@ for o in window-status-format window-status-current-format; do
     *) t set-option -g "@agent_saved_$o" "$cur"; t set-option -g "$o" "$FORMAT" ;;
   esac
 done
+# --- pane borders: orange / pink / green around the pane that needs you ------
+SUFFIX=$("$AS" border-suffix)
+for o in pane-border-style pane-active-border-style; do
+  cur=$(t show-option -gqv "$o")
+  case $cur in *@agent_pane_state*) ;; *) t set-option -g "@agent_saved_$o" "$cur"; t set-option -g "$o" "${cur}${SUFFIX}" ;; esac
+done
+
 # 0.4 prepended a per-pane glyph summary to status-right; it is gone.
 cur=$(t show-option -gqv status-right)
 case $cur in "#{@agent_summary}"*) t set-option -g status-right "${cur#"#{@agent_summary}"}" ;; esac

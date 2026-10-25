@@ -13,6 +13,7 @@
 #   global @agent_needs    count of windows needing you (blocked or ask), for titles
 #   window @agent_hold    wait | park                (user triage override)
 #   window @agent_icon / @agent_fg                   what the status bar draws
+#   (pane-border-style reads @agent_pane_state directly: a split pane that needs you gets a coloured border)
 #   window @agent_tab_owned  1 when window-status-style was set by us
 #   window @agent_tab_saved  the style that was there before we took the tab over
 #
@@ -274,6 +275,13 @@ clear_done_panes() { # clear_done_panes <window>: acknowledge every done pane
 BADGE='#{?#{@agent_icon},#[fg=#{@agent_fg}#,bold]#{@agent_icon}#[default],}'
 WINDOW_FORMAT="${BADGE}#I:#W#{?#{@agent_icon},,#{?window_flags,#{window_flags}, }}"
 
+# Pane borders: appended to pane-border-style and pane-active-border-style, so
+# in a split window the pane that needs you has an orange (blocked), pink
+# (ask) or green (done) border. A later attribute overrides an earlier one in
+# a style, and "#," is a literal comma inside a conditional, so the user's own
+# style stays in front as the base and nothing is added for other states.
+BORDER_SUFFIX='#{?#{==:#{@agent_pane_state},blocked},#,fg=colour208,}#{?#{==:#{@agent_pane_state},ask},#,fg=colour213,}#{?#{==:#{@agent_pane_state},done},#,fg=green,}'
+
 # A theme that sets window-status-format per window outranks the global one
 # and hides the badge on that window. Put it in front of the window's own value.
 mend_window_format() { # mend_window_format <window>
@@ -525,6 +533,7 @@ check() {
   if [ -n "${TMUX:-}" ]; then say ok "inside tmux ($TMUX_BIN)"; else say fail "TMUX is not set: run this from a pane"; fi
   if [ "$(t show-option -gqv @agent_signal_command)" = "$SELF" ]; then say ok "command path published"; else say fail "@agent_signal_command not published: source agent-signal.tmux"; fi
   case $(t show-option -gv window-status-format) in *@agent_icon*) say ok "badge in window-status-format" ;; *) say fail "badge missing from window-status-format" ;; esac
+  case $(t show-option -gv pane-border-style) in *@agent_pane_state*) say ok "state colours in pane-border-style" ;; *) say warn "state colours not in pane-border-style" ;; esac
   # Pane hooks (pane-exited, pane-died) are stored at window scope.
   n=$( { t show-hooks -g; t show-hooks -gw; } 2>/dev/null | grep -c "agent-signal"); if [ "$n" -ge 8 ]; then say ok "$n hooks installed"; else say fail "only $n of 8 hooks installed"; fi
   for k in next switcher wait park; do
@@ -545,9 +554,9 @@ check() {
 # --- uninstall -------------------------------------------------------------
 # The inverse of agent-signal.tmux plus a sweep of live windows and panes.
 uninstall() {
-  # The window formats go back to what the entry file found.
-  for o in window-status-format window-status-current-format; do
-    case $(t show-option -gqv "$o") in *@agent_icon*)
+  # The window formats and border styles go back to what the entry file found.
+  for o in window-status-format window-status-current-format pane-border-style pane-active-border-style; do
+    case $(t show-option -gqv "$o") in *@agent_icon*|*@agent_pane_state*)
       saved=$(t show-option -gqv "@agent_saved_$o")
       if [ -n "$saved" ]; then t set-option -g "$o" "$saved"; else t set-option -gu "$o"; fi ;;
     esac
@@ -592,6 +601,7 @@ case ${1:-} in
   needs|summary) refresh_needs ;;
   badge-format) printf '%s\n' "$BADGE" ;;
   window-format) printf '%s\n' "$WINDOW_FORMAT" ;;
+  border-suffix) printf '%s\n' "$BORDER_SUFFIX" ;;
   lock-path) lock_path "${2:?window}" ;;
   next)   next ;;
   hold)   case ${2:-} in wait|park|clear) hold "$2" "${3:-}" ;; *) echo "agent-signal hold: wait, park or clear" >&2; exit 1 ;; esac ;;

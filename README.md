@@ -29,7 +29,8 @@ and gives you one key to jump to whichever needs you most.
 Each tab carries its agent's state in front of the name: orange `!` is
 blocked on a permission, pink `?` is asking a question, green `✓` finished
 while you were elsewhere, a dim `~` is working. A green tab turns back to
-normal the moment you look at it. Nothing else on the bar is the plugin's.
+normal the moment you look at it. In a split window the pane that needs you
+gets a border in the same colour. Nothing else on the bar is the plugin's.
 
 ## Why
 
@@ -42,9 +43,10 @@ normal the moment you look at it. Nothing else on the bar is the plugin's.
 - **Done means done.** A green tab clears itself the moment you look at it,
   and a turn that finishes in front of you never nags.
 - **One look, no theme to configure.** The plugin sets the two window-tab
-  formats to `<badge><index>:<name>` and colours a tab only while its agent
-  needs you or has finished. Everything else in your status line is yours,
-  and `uninstall` puts the formats back.
+  formats to `<badge><index>:<name>`, colours a tab only while its agent
+  needs you or has finished, and colours a split pane's border the same way.
+  Everything else in your status line and your border styles is yours, and
+  `uninstall` puts it all back.
 - **Small and tested.** About 800 lines of POSIX `sh`, and a test suite that
   starts a real tmux server, pipes real hook JSON through the real script and
   asserts on the options. CI runs it on macOS and Ubuntu.
@@ -56,15 +58,15 @@ normal the moment you look at it. Nothing else on the bar is the plugin's.
 
 ## States
 
-| State     | Badge | Tab colour | Meaning                                              |
+| State     | Badge | Tab and pane border | Meaning                                              |
 |-----------|-------|------------|------------------------------------------------------|
 | working   | `~`   | unchanged  | agent is running a turn (dim, so it never competes)  |
 | blocked   | `!`   | orange     | a permission prompt is waiting on a keypress          |
 | ask       | `?`   | pink       | a question or plan approval is waiting on an answer   |
 | done      | `✓`   | green      | finished since you last looked at that window        |
 | idle      |       | unchanged  | at the prompt and you've seen it, or no agent here   |
-| wait      | `…`   | dim        | you've flagged it: skip in `next` until it changes   |
-| park      | `p`   | dim        | you've flagged it: skip in `next` until you unpark   |
+| wait      | `…`   | dim tab    | you've flagged it: skip in `next` until it changes   |
+| park      | `p`   | dim tab    | you've flagged it: skip in `next` until you unpark   |
 
 A window with several agent panes shows the most urgent one
 (blocked > ask > done > working). Sounds play for blocked, ask and done, only

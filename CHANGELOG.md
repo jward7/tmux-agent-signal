@@ -2,6 +2,11 @@
 
 ## Unreleased
 
+- **Pane borders.** In a split window, the pane whose agent is blocked,
+  asking or done gets a border in the tab's colour. The plugin appends a
+  conditional on `@agent_pane_state` to `pane-border-style` and
+  `pane-active-border-style`, leaving your own style as the base; `uninstall`
+  restores both.
 - **One look.** The badge now sits in front of the window name (`!3:web`)
   so it reads as part of that tab, and tmux's own window flag is dropped
   while a badge shows (the `*` on the current tab used to hide it). Working
