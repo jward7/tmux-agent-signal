@@ -11,6 +11,8 @@ is "installer keeps the user's existing Stop hook" "$(jq -r '.hooks.Stop[0].hook
 is "installer keeps unrelated settings"          "$(jq -r '.model' "$FIX/.claude/settings.json")" x
 is "installer registers all nine events"         "$(jq '.hooks | keys | length' "$FIX/.claude/settings.json")" 9
 is "installer quotes the plugin path"            "$(jq -r '.hooks.StopFailure[0].hooks[0].command' "$FIX/.claude/settings.json" | cut -c1)" '"'
+is "installer skips compaction for SessionStart" "$(jq -r '.hooks.SessionStart[0].matcher' "$FIX/.claude/settings.json")" "startup|resume|clear|fork"
+is "installer leaves other matchers open"        "$(jq -r '.hooks.PreToolUse[0].matcher' "$FIX/.claude/settings.json")" ""
 cp "$FIX/.claude/settings.json.bak-agent-signal" "$FIX/first-backup"
 HOME=$FIX "$AS" install-claude-hooks >/dev/null
 is "re-running the installer is idempotent"      "$(jq '.hooks.Stop | length' "$FIX/.claude/settings.json")" 2
@@ -26,6 +28,8 @@ is "integration hook files resolve the command through tmux, never a path" "$(gr
 is "plugin manifest is valid JSON with a name"       "$(jq -r .name "$ROOT/.claude-plugin/plugin.json")" tmux-agent-signal
 is "marketplace lists the plugin at the repo root"     "$(jq -r '.plugins[0].source' "$ROOT/.claude-plugin/marketplace.json")" "./"
 is "plugin hooks cover the same nine events as the installer" "$(jq -r '.hooks | keys | length' "$ROOT/hooks/hooks.json")" 9
+is "plugin hooks skip compaction for SessionStart" "$(jq -r '.hooks.SessionStart[0].matcher' "$ROOT/hooks/hooks.json")" "startup|resume|clear|fork"
+is "docs hooks skip compaction for SessionStart"   "$(jq -r '.hooks.SessionStart[0].matcher' "$ROOT/docs/claude-hooks.json")" "startup|resume|clear|fork"
 is "plugin hooks locate the script via CLAUDE_PLUGIN_ROOT" "$(jq -r '.hooks[][].hooks[].command' "$ROOT/hooks/hooks.json" | grep -vc CLAUDE_PLUGIN_ROOT)" 0
 is "plugin manifest version matches the script"        "$(jq -r .version "$ROOT/.claude-plugin/plugin.json")" "$(TMUX='' "$AS" version)"
 

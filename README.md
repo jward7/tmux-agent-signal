@@ -115,7 +115,7 @@ a running session, or start a new one, so Claude reloads its config.
 
 | Claude event                                  | State   |
 |-----------------------------------------------|---------|
-| `SessionStart`                                | idle, and pull the session name from Claude's registry |
+| `SessionStart` (startup, resume, clear, fork) | idle, and pull the session name from Claude's registry. The `compact` source is ignored: the agent is mid-turn |
 | `UserPromptSubmit`, `PreToolUse`, `PostToolUse` | working |
 | `PreToolUse` for AskUserQuestion              | ask (plan approval is not mapped here: it arrives as a `PermissionRequest`) |
 | `PermissionRequest`, `Notification` permission_prompt | blocked |

@@ -350,7 +350,10 @@ hook() {
   JSON=$(cat 2>/dev/null || true)
   AGENT_KIND=claude
   case $1 in
-    SessionStart)      set_state idle; sync_registry ;;
+    SessionStart)
+      # Auto-compaction mid-turn also fires SessionStart (source "compact");
+      # the agent is still working, so nothing about the pane has changed.
+      case $(json_get '.source' source) in compact) ;; *) set_state idle; sync_registry ;; esac ;;
     UserPromptSubmit|PostToolUse) set_state working ;;
     PreToolUse)
       case $(json_get '.tool_name' tool_name) in
@@ -477,7 +480,8 @@ install_claude_hooks() {
   # The path is double-quoted inside the command because Claude runs hooks
   # through a shell and a plugin directory may contain spaces.
   jq --arg bin "$SELF" '
-    def entry($ev): {matcher: "", hooks: [{type: "command", command: ("\"" + $bin + "\" hook " + $ev), async: true}]};
+    def matcher($ev): if $ev == "SessionStart" then "startup|resume|clear|fork" else "" end;
+    def entry($ev): {matcher: matcher($ev), hooks: [{type: "command", command: ("\"" + $bin + "\" hook " + $ev), async: true}]};
     def add($ev): .hooks[$ev] = ((.hooks[$ev] // []) | map(select((.hooks // []) | any(.command | tostring | contains("agent-signal\" hook") or contains("agent-signal hook")) | not)) + [entry($ev)]);
     .hooks //= {} |
     reduce ("SessionStart","UserPromptSubmit","PreToolUse","PostToolUse","PermissionRequest","Notification","Stop","StopFailure","SessionEnd") as $ev (.; add($ev))

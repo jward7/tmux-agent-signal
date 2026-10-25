@@ -2,6 +2,9 @@
 
 ## Unreleased
 
+- A `SessionStart` fired by auto-compaction no longer resets a working pane to
+  idle mid-turn. The hook files match only `startup|resume|clear|fork`, and the
+  script ignores the `compact` source for hooks installed before this change.
 - The per-window lock key no longer needs `cksum` or `cut` on PATH: the server
   socket path is flattened in plain shell. A hook run from a trimmed PATH used
   to print "cksum: command not found" and key every server's locks the same.

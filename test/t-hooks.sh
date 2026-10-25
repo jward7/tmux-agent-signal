@@ -15,6 +15,11 @@ is "working icon"                    "$(wicon "$W_API")" "~"
 is "working leaves tab colour alone" "$(wstyle "$W_API")" ""
 hook "$P_API" PreToolUse '{"tool_name":"Bash"}'
 is "PreToolUse Bash -> working"      "$(wst "$W_API")" working
+hook "$P_API" SessionStart '{"source":"compact"}'
+is "SessionStart from compaction leaves a working pane working" "$(wst "$W_API")" working
+hook "$P_API" SessionStart '{"source":"resume"}'
+is "SessionStart from resume -> idle" "$(wst "$W_API")" ""
+hook "$P_API" UserPromptSubmit
 hook "$P_API" PreToolUse '{"tool_name":"AskUserQuestion"}'
 is "PreToolUse AskUserQuestion -> ask" "$(wst "$W_API")" ask
 is "ask counts as needing you"       "$(gneeds)" 1
