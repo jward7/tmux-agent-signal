@@ -2,8 +2,9 @@
 
 ## 0.4.0 (2026-10-25)
 
-Learnings from a read of [workmux](https://github.com/raine/workmux), whose
-status-tracking layer has been through a long tail of user-reported fixes.
+The hook and integration items below come from a read of
+[workmux](https://github.com/raine/workmux), whose status-tracking layer has
+been through a long tail of user-reported fixes.
 
 **Behaviour**
 
@@ -26,10 +27,13 @@ status-tracking layer has been through a long tail of user-reported fixes.
 - Hooks fired by a Claude background job (`CLAUDE_JOB_DIR` set) are ignored,
   so a job finishing in the background no longer marks the interactive pane
   done or working.
+
+**Any agent**
+
 - A report with no pane given and no `TMUX_PANE` in the environment is
   attributed by process ancestry (the pane whose shell is an ancestor of the
-  hook) rather than to the client's active pane, which was the wrong window
-  whenever you were looking elsewhere.
+  caller) before falling back to the client's active pane, which was the
+  wrong window whenever you were looking elsewhere.
 - `AGENT_SIGNAL_DISABLE=1` in an agent's environment makes every report from
   it a no-op, so an agent launched inside another agent's pane does not
   overwrite its parent's state.
@@ -45,7 +49,7 @@ status-tracking layer has been through a long tail of user-reported fixes.
   Gemini's `Notification` hook matches only `ToolPermission`; Pi does not
   report done after an aborted turn it will continue from; OpenCode derives
   the word from every session it serves and gains a plugin API v2 (TUI)
-  variant. All stay silent without `TMUX_PANE`.
+  variant. Pi and OpenCode stay silent without `TMUX_PANE`.
 
 **Internals and tests**
 

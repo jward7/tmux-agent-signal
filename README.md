@@ -159,15 +159,16 @@ say), both report and the child overwrites the parent. Set
 without touching the pane.
 
 Ready-made mappings for Codex CLI, Gemini CLI, Copilot CLI, OpenCode, Pi,
-Grok CLI and Antigravity CLI are in [`integrations/`](integrations/), each a one-file drop with its
-event table. They were written from the vendors' documentation and are not
+Grok CLI and Antigravity CLI are in [`integrations/`](integrations/), each
+with its event table. They were written from the vendors' documentation and
+from [workmux](https://github.com/raine/workmux)'s shipped hooks, and are not
 exercised here, so reports and fixes from people who run those agents are
 welcome.
 
 ### Command reference
 
-All commands take the pane from `$TMUX_PANE` or the window from the current
-client unless one is given.
+All commands take the pane from `$TMUX_PANE`, else the pane whose shell is an
+ancestor of the caller, else the current client's window, unless one is given.
 
 | Command | What it does |
 |---|---|
@@ -244,7 +245,7 @@ set -g @agent_signal_notify off           # on = desktop banner too (terminal-no
 # against the window; the shell gets AGENT_SIGNAL_STATE, AGENT_SIGNAL_PREV,
 # AGENT_SIGNAL_WINDOW and AGENT_SIGNAL_PANE.
 set -g @agent_signal_alert_command 'terminal-notifier -title "#{session_name}:#{window_name}" -message "agent is $AGENT_SIGNAL_STATE" -execute "tmux switch-client -t $AGENT_SIGNAL_WINDOW"'
-set -g @agent_signal_alert_states 'blocked ask done
+set -g @agent_signal_alert_states 'blocked ask done'
 set -g @agent_signal_bell off             # on = also ring tmux's bell in the pane (monitor-bell, works over SSH)
 
 # Keys ("" disables a binding)
@@ -334,8 +335,8 @@ snapshot as of **2026-09-07**, agent rows re-checked **2026-10-25**.
 [workmux](https://github.com/raine/workmux) is left out because it is a
 worktree manager with a status layer, not a status plugin, but several of
 this plugin's integrations were corrected against its. tmux-agent-state is the closest relative:
-the same hook-driven, no-daemon design, with more agent integrations and
-without the triage, switcher and summary layers. 🟢 has it, 🟡 partial or optional, 🔴 does not,
+the same hook-driven, no-daemon design, without the triage, switcher and
+summary layers. 🟢 has it, 🟡 partial or optional, 🔴 does not,
 ▫️ not applicable. Corrections welcome.
 
 | | tmux-agent-signal | [tmux-agent-state](https://github.com/cburmeister/tmux-agent-state) | [samleeney/tmux-agent-status](https://github.com/samleeney/tmux-agent-status) | [gentle-agent-state](https://github.com/Gentleman-Programming/gentle-agent-state) | [RatulMaharaj/tmux-agent-status](https://github.com/RatulMaharaj/tmux-agent-status) | [herdr](https://github.com/herdrdev/herdr) |
@@ -355,7 +356,7 @@ without the triage, switcher and summary layers. 🟢 has it, 🟡 partial or op
 | Sounds | 🟢 | 🟡 bell; bring your own notifier | 🟢 | 🟢 | 🟢 | 🟢 |
 | Background task awareness | 🟢 | 🔴 | 🟢 | 🔴 | 🔴 | ▫️ |
 | Claude Code | 🟢 plugin or hooks | 🟢 plugin install | 🟢 | 🟢 | 🟢 | 🟢 |
-| Codex CLI | 🟢 hooks, from docs | 🟡 done only | 🟢 | 🟢 | 🟡 presence only | 🟢 |
+| Codex CLI | 🟡 from docs | 🟡 done only | 🟢 | 🟢 | 🟡 presence only | 🟢 |
 | Pi / OpenCode | 🟡 from docs / 🟡 from docs | 🟡 no confirmation prompts / 🟢 | 🔴 / 🔴 | 🟢 / 🟢 | 🔴 / 🟡 presence only | 🟢 |
 | Gemini CLI / Copilot CLI | 🟡 from docs / 🟡 from docs | 🟢 / 🟢 | 🔴 / 🟡 custom status file | 🔴 | 🔴 | 🔴 |
 | Grok CLI / Antigravity CLI | 🟡 from workmux's hooks / 🟡 from workmux's hooks | 🔴 | 🔴 | 🔴 | 🔴 | 🟢 / 🔴 |
@@ -373,7 +374,7 @@ is the smallest option that still covers triage and navigation.
 
 ```
 Claude hook ──> agent-signal hook Stop ──> tmux set -p @agent_pane_state done
-                                        └─> recompute window: @agent_state,
+                                        └─> recompute window: @agent_state, @agent_since,
                                             @agent_icon, @agent_fg, window-status-style
                                         └─> recompute @agent_summary, @agent_needs
                                         └─> not on screen? play sound
@@ -385,6 +386,9 @@ after-select-window / client-focus-in hook ──> agent-signal seen <window> �
 Claude runs hooks concurrently, so each update takes a lock keyed on the
 server socket and window id (a `mkdir` in `$TMPDIR`, reclaimed if a holder
 was killed) before reading and rewriting the window's state.
+
+`@agent_since` records when a window's aggregate state last changed, and
+`next` uses it to serve the longest wait first within a tier.
 
 Per-pane state lets several agents share a window. The window shows the most
 urgent pane. Pane state is stored under `@agent_pane_state`, a different name
@@ -421,7 +425,9 @@ the fixture and helpers. CI runs lint and the suite on Ubuntu and macOS.
 - **Nothing changes.** Run `agent-signal check` inside a pane: it says what is
   and is not wired. If everything is ok there, run `agent-signal set blocked`;
   if the tab changes, tmux is fine and the hooks are not firing, so check
-  `~/.claude/settings.json` and open `/hooks` in Claude to reload.
+  `~/.claude/settings.json` and open `/hooks` in Claude to reload. If even
+  `set blocked` does nothing, make sure `AGENT_SIGNAL_DISABLE` is not set in
+  that shell; for hooks, `CLAUDE_JOB_DIR` has the same effect.
 - **Copy-mode keys or plugin hooks stop working during a Homebrew tmux
   upgrade.** Homebrew unlinks `tmux` from `/usr/local/bin` while it builds.
   Plugins that shell out to `tmux` (tmux-yank, tmux-copycat) fail until it is
@@ -436,7 +442,7 @@ the fixture and helpers. CI runs lint and the suite on Ubuntu and macOS.
 - **The badge does not appear with a theme.** Load this plugin after the
   theme. The badge is appended to whatever `window-status-format` is set when
   the plugin loads.
-- **`next` says nothing needs you** while a tab is orange or green: the
+- **`next` says nothing needs you** while a tab is orange or pink: the
   window is on `wait` or `park`. `prefix + W` / `prefix + P` clears it.
 
 ## License

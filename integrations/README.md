@@ -31,7 +31,8 @@ nothing, so a broken indicator can never block an agent.
 | [Antigravity CLI](antigravity/) | hooks in `~/.gemini/config/hooks.json` | yes | | | yes | from workmux's hooks, not exercised here |
 
 "From the docs" means the mapping was written against the vendor's published
-hook or plugin reference, in September 2026, by someone who does not run that
+hook or plugin reference (and, where the table says so, workmux's shipped
+hooks), in September and October 2026, by someone who does not run that
 agent. If you do, a report that it works, or a fix, is the most useful pull
 request this repo can get. An agent that fires no event for a state simply
 never shows that state; the tab is honest about what the agent can say.
