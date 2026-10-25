@@ -209,9 +209,14 @@ paint_window() { # paint_window <window> <state-or-hold>
 # across many tmux calls. A per-window mkdir lock keeps two hooks for panes in
 # the same window from overwriting each other's result.
 # Window ids repeat across tmux servers, so the lock is keyed on the server's
-# socket path as well (a checksum keeps the name short and free of slashes).
+# socket path as well, with its slashes swapped for underscores in plain shell
+# so the hook needs no cksum or cut on PATH.
 lock_path() { # lock_path <window>
-  printf '%s/agent-signal.%s.lock.%s.%s' "${TMPDIR:-/tmp}" "$(id -u)" "$(printf '%s' "${TMUX%%,*}" | cksum | cut -d' ' -f1)" "${1#@}"
+  key=${TMUX%%,*}; flat=
+  while :; do
+    case $key in */*) flat="$flat${key%%/*}_"; key=${key#*/} ;; *) flat="$flat$key"; break ;; esac
+  done
+  printf '%s/agent-signal.%s.lock.%s.%s' "${TMPDIR:-/tmp}" "$(id -u)" "$flat" "${1#@}"
 }
 lock_window() { # lock_window <window>
   LOCK=$(lock_path "$1")

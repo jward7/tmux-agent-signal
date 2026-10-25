@@ -58,8 +58,12 @@ ascii() { # ascii on|off
 attach_client() { # attach_client <session>
   FIFO="$TMPDIR/client-input"
   mkfifo "$FIFO"
-  # Hold the FIFO open, or the client's terminal sees end of input and quits.
-  (exec 3>"$FIFO"; while :; do sleep 1; done) & CLIENT_PIDS="$!"
+  # Hold the FIFO open read-write from this process: the client's terminal
+  # never sees end of input, and a write to it never blocks waiting for a
+  # reader, so a client that failed to start fails the test instead of
+  # hanging it (BSD script on a CI runner with no terminal did exactly that).
+  exec 3<>"$FIFO"
+  CLIENT_PIDS=
   if script --version 2>/dev/null | grep -q util-linux; then
     TERM=xterm-256color script -qfec "tmux -L $SOCK attach -t $1" /dev/null <"$FIFO" >/dev/null 2>&1 &
   else
@@ -67,11 +71,12 @@ attach_client() { # attach_client <session>
   fi
   CLIENT_PIDS="$CLIENT_PIDS $!"
   i=0; while [ -z "$(T list-clients)" ] && [ $i -lt 100 ]; do sleep 0.05; i=$((i + 1)); done
+  [ -n "$(T list-clients)" ] || bad "attach_client: a client attached within 5s" "none" "one"
 }
 # Send the terminal's focus report (CSI I / CSI O) and wait until tmux has
 # taken it in. Needs focus-events on.
 focus() { # focus in|out
-  if [ "$1" = in ]; then printf '\033[I' >"$FIFO"; want=yes; else printf '\033[O' >"$FIFO"; want=no; fi
+  if [ "$1" = in ]; then printf '\033[I' >&3; want=yes; else printf '\033[O' >&3; want=no; fi
   i=0
   while [ $i -lt 100 ]; do
     case ",$(T list-clients -F '#{client_flags}')," in *,focused,*) got=yes ;; *) got=no ;; esac

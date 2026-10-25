@@ -2,6 +2,12 @@
 
 ## Unreleased
 
+- The per-window lock key no longer needs `cksum` or `cut` on PATH: the server
+  socket path is flattened in plain shell. A hook run from a trimmed PATH used
+  to print "cksum: command not found" and key every server's locks the same.
+- `attach_client` in `test/lib.sh` holds its FIFO open read-write, so a client
+  that fails to start fails `t-focus.sh` instead of hanging it, which the
+  macOS CI runner did.
 - "On screen" now needs a focused client showing the window, not just an
   attached session. With one session per terminal tab every session is
   attached, so a turn finishing in a background tab went straight to idle
