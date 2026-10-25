@@ -1,10 +1,10 @@
 {
   "name": "tmux-agent-signal",
   "version": "0.4.2",
-  "description": "Show this session's state (working, blocked, asking, done) in the tmux window list.",
+  "description": "Know which agent needs you, from the tmux status bar: working, blocked, asking, done as a badge and tab colour per window, with a key to jump to the next one.",
   "author": { "name": "Justin Ward" },
   "repository": "https://github.com/jward7/tmux-agent-signal",
   "license": "MIT",
-  "keywords": ["tmux", "status-bar", "hooks"],
+  "keywords": ["tmux", "status-bar", "hooks", "claude-code", "codex", "agents"],
   "hooks": "./hooks/hooks.json"
 }

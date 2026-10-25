@@ -1,20 +1,58 @@
-# tmux-agent-signal
+<div align="center">
 
-See which tmux window has an AI coding agent that is **working**, **blocked on
-you**, or **done**, straight from the window list in your status bar. Jump to
-the next one that needs you with a key. No sidebar, no daemon, no polling.
+<picture>
+  <source media="(prefers-color-scheme: dark)" srcset="docs/img/logo-dark.svg">
+  <img alt="tmux-agent-signal" src="docs/img/logo-light.svg" width="520">
+</picture>
 
-![status bar with agent badges](docs/demo.png)
+**Know which agent needs you, from the tmux status bar.**
 
-Left: how many windows need you, and the Claude session in the active pane.
-Middle: `2:web` is blocked on a permission (orange), `3:docs` finished while
-you were elsewhere (green), `4:infra` is asking a question (pink), `1:api` and
-`5:data` are working (`~`). Right: one glyph per agent with its window number.
+[Install](#install) · [Keys](#keys) · [Configuration](docs/configuration.md) · [Commands](docs/commands.md) · [Comparison](docs/comparison.md) · [Changelog](CHANGELOG.md)
 
-State is written by the agent's own lifecycle hooks into tmux user options and
-read natively by the status line. Nothing runs on redraw. Claude Code is wired
-up out of the box; any agent with hooks or an extension API can report the
-same few words.
+[![CI](https://github.com/jward7/tmux-agent-signal/actions/workflows/ci.yml/badge.svg)](https://github.com/jward7/tmux-agent-signal/actions/workflows/ci.yml)
+![POSIX sh](https://img.shields.io/badge/POSIX_sh-~800_lines-4cc24c)
+![tmux 3.1+](https://img.shields.io/badge/tmux-3.1%2B-1BB91F)
+![tested on macOS and Linux](https://img.shields.io/badge/tested_on-macOS_%7C_Linux-blue)
+[![MIT](https://img.shields.io/badge/license-MIT-lightgrey)](LICENSE)
+
+</div>
+
+---
+
+You run five coding agents in five tmux windows. Which one is waiting on a
+permission? Which one finished while you were reading a diff? This plugin
+puts the answer in the window list you already look at, colours the tab,
+and gives you one key to jump to whichever needs you most.
+
+![agents changing state in the tmux status bar](docs/demo.gif)
+
+Left: how many windows need you, and the agent in the active pane. Middle:
+orange `!` is blocked on a permission, pink `?` is asking a question, green
+`✓` finished while you were elsewhere, `~` is working. Right: one glyph per
+agent with its window number. A green tab turns back to normal the moment you
+look at it.
+
+## Why
+
+- **No daemon, no polling, no sidebar.** The agent's own lifecycle hooks write
+  a few tmux options. The status line reads them natively. Nothing runs on
+  redraw.
+- **Triage, not just a badge.** Permission prompts, questions and finished
+  turns are told apart. `prefix + N` goes to the most urgent window that has
+  waited longest. Flag a window as *wait* or *park* to skip it.
+- **Done means done.** A green tab clears itself the moment you look at it,
+  and a turn that finishes in front of you never nags.
+- **Plays well with your setup.** The badge is appended to whatever your theme
+  put in `window-status-format`. Tab colours are only touched when the plugin
+  set them, and restored afterwards.
+- **Small and tested.** About 800 lines of POSIX `sh`, and a test suite that
+  starts a real tmux server, pipes real hook JSON through the real script and
+  asserts on the options. CI runs it on macOS and Ubuntu.
+- **Any agent.** Claude Code is wired up out of the box, as a tmux plugin or a
+  Claude Code plugin. Codex CLI, Pi, OpenCode, Gemini CLI, Copilot CLI, Grok
+  CLI and Antigravity CLI have ready-made hook files in
+  [`integrations/`](integrations/). Anything that can run a shell command
+  can report with `agent-signal set blocked`.
 
 ## States
 
@@ -28,29 +66,26 @@ same few words.
 | wait      | `…`   | dim        | you've flagged it: skip in `next` until it changes   |
 | park      | `p`   | dim        | you've flagged it: skip in `next` until you unpark   |
 
+A window with several agent panes shows the most urgent one
+(blocked > ask > done > working). Sounds play for blocked, ask and done, only
+when the window is not on screen. With `@agent_signal_title on`, the outer
+terminal's title carries the count too: `[2 need you] session:window`.
+
+<details>
+<summary>How "seen" works</summary>
+
 `done` flips to idle automatically when you view the window. If a turn
 finishes in the window you are already looking at, it never shows `done`.
 "Looking at" means the window is shown in a focused terminal: with one
 session per terminal tab, a finish in a background tab still shows `done`,
 and focusing that tab clears it (needs `focus-events on`; a terminal that
-never reports focus counts as always focused).
-A window with several agent panes shows the most urgent one
-(blocked > ask > done > working). blocked and ask always show through a wait
-or park.
+never reports focus counts as always focused). blocked and ask always show
+through a wait or park.
+</details>
 
-Sounds play for blocked, ask and done, only when the window is not on screen.
+## Keys
 
-**Fleet summary.** One entry per agent pane is prepended to `status-right`:
-a glyph for the agent kind (`✳` Claude, `⬢` Codex, `π` Pi, `●` other)
-followed by its window index, coloured by that pane's state, like
-`✳1 ✳2 ✳4 ✳6`. The number is the window to jump to with `prefix + <index>`,
-so an orange `✳4` means "window 4 needs you".
-
-**Terminal title.** With `@agent_signal_title on`, tmux sets the outer
-terminal's title to `[2 need you] session:window`, so iTerm2's tab shows the
-count even when another app is in front.
-
-## Keys (all `prefix +`, configurable)
+All `prefix +`, all configurable.
 
 | Key | Action |
 |-----|--------|
@@ -60,39 +95,42 @@ count even when another app is in front.
 | `P` | toggle **park** on the current window |
 
 Inside the switcher: `enter` go, `ctrl-x` close the selected pane, window or
-session (asks first unless `@agent_signal_confirm_close off`), `ctrl-w` wait,
-`ctrl-p` park, `esc` quit.
+session (asks first), `ctrl-w` wait, `ctrl-p` park, `esc` quit.
 
 ## Install
 
-Requirements: tmux 3.1+ (pane options), `/bin/sh`. Tested in CI on tmux 3.4
-(Ubuntu 24.04) and 3.7 (Homebrew); 3.5 or later is nicer (see the dead-pane
-note under Troubleshooting) but not required. Optional: `jq` (hook JSON
-parsing and the hook installer; without it a sed fallback is used),
-`fzf` for the switcher, `afplay` (macOS) or `paplay` (Linux) for sounds.
+Requirements: tmux 3.1+ and `/bin/sh`. Optional: `jq` (hook JSON parsing and
+the hook installer; a sed fallback is used without it), `fzf` for the
+switcher, `afplay` (macOS) or `paplay` (Linux) for sounds.
 
-With [tpm](https://github.com/tmux-plugins/tpm):
+### 1. The tmux side
+
+With [tpm](https://github.com/tmux-plugins/tpm), **after** any theme plugin so
+the badge is appended to the theme's window format:
 
 ```tmux
 set -g @plugin 'jward7/tmux-agent-signal'
 ```
 
-then `prefix + I`. Put the line **after** any theme plugin so the badge is
-appended to the theme's window format rather than overwritten.
+then `prefix + I`.
 
-If your plugin list lives in a file that tmux `if-shell`-sources, tpm cannot
-see `@plugin` lines there; use the `@tpm_plugins` option instead (see
-[Recommended setup](#recommended-setup)).
+<details>
+<summary>Without tpm, or with an <code>if-shell</code>-sourced plugin list</summary>
 
-Without tpm, clone anywhere and add to the end of `~/.tmux.conf`:
+Clone anywhere and add to the end of `~/.tmux.conf`:
 
 ```tmux
 run-shell '/path/to/tmux-agent-signal/agent-signal.tmux'
 ```
 
-### Claude Code hooks
+If your plugin list lives in a file that tmux `if-shell`-sources, tpm cannot
+see `@plugin` lines there; use `@tpm_plugins` instead, see
+[Recommended setup](docs/recommended-setup.md).
+</details>
 
-The repo is also a Claude Code plugin, so the quickest route is:
+### 2. The agent side
+
+**Claude Code.** The repo is also a Claude Code plugin:
 
 ```
 /plugin marketplace add jward7/tmux-agent-signal
@@ -103,353 +141,93 @@ New sessions report immediately; running ones after `/reload-plugins`. The
 plugin carries its own copy of the script and wires the tmux server up on
 its first event, so it works even before tpm has loaded the tmux side.
 
-If you'd rather keep hooks in your own settings, run once (needs `jq`;
-merges with any existing hooks and keeps a backup):
+<details>
+<summary>Prefer hooks in your own <code>~/.claude/settings.json</code>?</summary>
+
+Run once (needs `jq`; merges with any existing hooks and keeps a backup):
 
 ```sh
 ~/.tmux/plugins/tmux-agent-signal/bin/agent-signal install-claude-hooks
 ```
 
-or copy [`docs/claude-hooks.json`](docs/claude-hooks.json) into
-`~/.claude/settings.json` by hand (Claude runs hook commands through a shell,
-so `$HOME` expands and the quoted path survives spaces). Then open `/hooks` in
-a running session, or start a new one, so Claude reloads its config.
+or copy [`docs/claude-hooks.json`](docs/claude-hooks.json) in by hand, then
+open `/hooks` in a running session so Claude reloads its config. The full
+event-to-state mapping is in [docs/commands.md](docs/commands.md#claude-code-hook-mapping).
+</details>
 
-| Claude event                                  | State   |
-|-----------------------------------------------|---------|
-| `SessionStart` (startup, resume, clear, fork) | idle, and pull the session name from Claude's registry. The `compact` source is ignored: the agent is mid-turn |
-| `UserPromptSubmit`, `PreToolUse`, `PostToolUse` | working |
-| `PreToolUse` for AskUserQuestion              | ask (plan approval is not mapped here: it arrives as a `PermissionRequest`) |
-| `PermissionRequest`, `Notification` permission_prompt | blocked |
-| `Notification` elicitation, agent_needs_input | ask |
-| `Notification` idle_prompt                    | done, but only if the pane is still marked working (a turn ended with Esc skips `Stop`). Otherwise ignored, since this fires a minute after every finish |
-| `Stop` or `StopFailure` with no background tasks | done    |
-| `Stop` while a background task is still running | working, until a later `Stop` reports it finished |
-| `SessionEnd`                                  | cleared |
-| any event from a background job (`CLAUDE_JOB_DIR` set) | ignored: the pane's state belongs to the interactive session |
-
-Hooks are registered `async` so they never delay Claude. Each call is a
-handful of tmux commands: on an 18-pane server one event costs about a dozen
-tmux client calls, roughly half a second on a slow machine and much less on a
-fast one. Updates to the same window are serialised with a lock, since Claude
-runs hooks concurrently.
-
-### Other agents
-
-Any agent that can run a command on lifecycle events can report:
+**Codex, Pi, OpenCode, Gemini, Copilot, Grok, Antigravity.** Each has a
+directory in [`integrations/`](integrations/) with the hook file to drop in
+and its event table. Any other agent:
 
 ```sh
 agent-signal set working|blocked|ask|done [pane-id]
 agent-signal clear [pane-id]
 ```
 
-The pane defaults to `$TMUX_PANE`, which tmux exports to every process in the
-pane. If an agent drops it (Claude occasionally runs a hook without it), the
-script walks its own parent processes to the pane's shell, and only when that
-fails does it use the client's active pane. Set `AGENT_KIND=codex` (or `pi`, `opencode`, ...) in the environment so
-the switcher labels it. Nothing needs to know where the plugin is installed:
-the entry file publishes the script's path as a server option, so a hook can
-always call
+### 3. Check it
 
 ```sh
-"$(tmux show -gv @agent_signal_command)" set blocked
+agent-signal check         # reports what is wired on this server and what is missing
+agent-signal set blocked   # the current tab should turn orange
 ```
 
-If one agent launches another inside the same pane (Claude running Codex,
-say), both report and the child overwrites the parent. Set
-`AGENT_SIGNAL_DISABLE=1` on the nested command and its hooks exit quietly
-without touching the pane.
-
-Ready-made mappings for Codex CLI, Gemini CLI, Copilot CLI, OpenCode, Pi,
-Grok CLI and Antigravity CLI are in [`integrations/`](integrations/), each
-with its event table. They were written from the vendors' documentation and
-from [workmux](https://github.com/raine/workmux)'s shipped hooks, and are not
-exercised here, so reports and fixes from people who run those agents are
-welcome.
-
-### Command reference
-
-All commands take the pane from `$TMUX_PANE`, else the pane whose shell is an
-ancestor of the caller, else the current client's window, unless one is given.
-
-| Command | What it does |
-|---|---|
-| `hook <Event>` | Claude Code hook entry; reads the hook JSON on stdin |
-| `set working\|blocked\|ask\|done\|idle [pane]` | report a state for any agent |
-| `clear [pane]` | the agent exited; drop its state, kind and name |
-| `seen [window]` | mark a done window as viewed (the hooks call this) |
-| `next` | switch to the next blocked window, else ask, else done, oldest wait first, skipping wait and park |
-| `hold wait\|park\|clear [window]` | toggle a triage hold |
-| `list` | the session > window > pane tree the switcher shows |
-| `sync` | pull names and presence from Claude's session registry |
-| `summary` | recompute the status-right glyphs and the needs-you count |
-| `check` | report what is wired on this server and what is missing; exit 1 if broken |
-| `install-claude-hooks` | merge the hooks into `~/.claude/settings.json` (needs jq) |
-| `uninstall` | reverse everything the entry file set on the server |
-| `lock-path <window>` | print the lock directory for a window (debugging) |
-| `help`, `version` | |
-
-### Uninstall
-
-```sh
-~/.tmux/plugins/tmux-agent-signal/bin/agent-signal uninstall
-```
-
-removes the status-bar fragments, hooks, key bindings and any per-window or
-per-pane state from the running server. Then drop the plugin line from your
-tmux config and delete the `agent-signal` entries from the hooks block in
-`~/.claude/settings.json`.
+> [!TIP]
+> `sh docs/demo.sh` builds a throwaway server showing every state, with no
+> agents involved. `tmux -L demo attach` to look around, `tmux -L demo
+> kill-server` to bin it.
 
 ## Configuration
 
-Set any of these in `tmux.conf` before the plugin loads.
+Every badge, colour, glyph, sound, key and the alert command are options you
+set in `tmux.conf` before the plugin loads. The common ones:
 
 ```tmux
-# Badges: "<icon> <fg> <bg>"; bg "default" leaves the tab colour alone
-set -g @agent_signal_working '~ yellow default'
-set -g @agent_signal_blocked '! black colour208'
-set -g @agent_signal_ask     '? black colour213'
-set -g @agent_signal_done    '✓ black green'
-set -g @agent_signal_wait    '… colour245 default'
-set -g @agent_signal_park    'p colour240 default'
-set -g @agent_signal_tab_colour all       # all: colour the tab for every state that has one
-                                          # needs: colour it only when the window needs you (blocked, ask)
-                                          # off: badge only, never restyle the tab
-set -g @agent_signal_ascii off            # on = plain ASCII defaults (+ . ?) for fonts without ✓ …
-
-# Fleet summary glyphs and colours (status-right)
-set -g @agent_signal_glyph_claude '✳'
-set -g @agent_signal_glyph_codex  '⬢'
-set -g @agent_signal_glyph_pi     'π'
-set -g @agent_signal_glyph_other  '●'
-set -g @agent_signal_colour_working yellow
-set -g @agent_signal_colour_blocked colour208
-set -g @agent_signal_colour_ask     colour213
-set -g @agent_signal_colour_done    green
-set -g @agent_signal_colour_idle    colour245
-
-# Outer terminal title
-set -g @agent_signal_title off            # on = set-titles with the needs-you count
-set -g @agent_signal_title_format '#{?@agent_needs,[#{@agent_needs} need you] ,}#S:#W'
-
-set -g @agent_signal_confirm_close on     # off = switcher closes without asking
-
-# Sounds (macOS system sound names, or a file path; "off" to silence one)
-set -g @agent_signal_sound on
-set -g @agent_signal_sound_blocked Ping
-set -g @agent_signal_sound_ask Ping
-set -g @agent_signal_sound_done Glass
-
-set -g @agent_signal_notify off           # on = desktop banner too (terminal-notifier, osascript, notify-send)
-
-# Or run anything you like when a window changes state. Runs in the background,
-# only on a transition (blocked -> blocked stays quiet). tmux formats expand
-# against the window; the shell gets AGENT_SIGNAL_STATE, AGENT_SIGNAL_PREV,
-# AGENT_SIGNAL_WINDOW and AGENT_SIGNAL_PANE.
-set -g @agent_signal_alert_command 'terminal-notifier -title "#{session_name}:#{window_name}" -message "agent is $AGENT_SIGNAL_STATE" -execute "tmux switch-client -t $AGENT_SIGNAL_WINDOW"'
-set -g @agent_signal_alert_states 'blocked ask done'
-set -g @agent_signal_bell off             # on = also ring tmux's bell in the pane (monitor-bell, works over SSH)
-
-# Keys ("" disables a binding)
-set -g @agent_signal_key_next N
-set -g @agent_signal_key_switcher A
-set -g @agent_signal_key_wait W
-set -g @agent_signal_key_park P
+set -g @agent_signal_tab_colour needs   # colour tabs only for blocked and ask
+set -g @agent_signal_ascii on           # + . ? instead of ~ ✓ … for plain fonts
+set -g @agent_signal_sound off
+set -g @agent_signal_notify on          # desktop banner via terminal-notifier / notify-send
+set -g @agent_signal_title on           # "[2 need you]" in the terminal title
+set -g @agent_signal_key_next ''        # unbind a key
 ```
 
-## Recommended setup
+The full list, including per-state colours, fleet glyphs, sounds and a hook
+for running your own command on every state change, is in
+[docs/configuration.md](docs/configuration.md).
 
-These are independent of the plugin but make the whole "many agents in tmux"
-workflow hold together.
+## More
 
-**Resume agents after a tmux restart.**
-[tmux-resurrect](https://github.com/tmux-plugins/tmux-resurrect) and
-[tmux-continuum](https://github.com/tmux-plugins/tmux-continuum) bring your
-layout back, but a Claude pane comes back as a dead shell with the old
-transcript painted in.
-[tmux-assistant-resurrect](https://github.com/timvw/tmux-assistant-resurrect)
-records each agent's session ID at save time and relaunches it with
-`claude --resume <id>` on restore. It also supports Codex, Pi, Cursor,
-Copilot, OpenCode and Grok. Needs `jq`.
-
-```tmux
-set -g @plugin 'tmux-plugins/tmux-resurrect'
-set -g @plugin 'tmux-plugins/tmux-continuum'
-set -g @plugin 'timvw/tmux-assistant-resurrect'
-set -g @continuum-restore 'on'
-```
-
-Window state is not saved by resurrect. After a restore, badges reappear as
-each agent's hooks fire again.
-
-**Name your Claude sessions.** Claude Code sessions can message each other by
-name (`/list-agents`, `SendMessage`). Derived names like `trade-39` are hard to
-tell apart. Start sessions with `claude --name <repo>/<branch>` or `/rename`.
-The plugin shows these names in the switcher. A shell function that does this
-automatically:
-
-```zsh
-claude() {
-  case " $* " in
-    *" -n "*|*" --name "*|*" -r "*|*" --resume"*|*" -c "*|*" --continue "*) command claude "$@" ;;
-    *) local root branch name
-       if root=$(git rev-parse --show-toplevel 2>/dev/null); then
-         branch=$(git rev-parse --abbrev-ref HEAD 2>/dev/null); name="${root:t}"
-         [ -n "$branch" ] && [ "$branch" != main ] && [ "$branch" != master ] && name="$name/$branch"
-       else name="${PWD:t}"; fi
-       command claude --name "$name" "$@" ;;
-  esac
-}
-```
-
-**tmux settings Claude Code wants** (from its terminal docs):
-
-```tmux
-set -g allow-passthrough on          # desktop notifications and progress reach the outer terminal
-set -s extended-keys on              # Shift+Enter
-set -as terminal-features 'xterm*:extkeys'
-set -g focus-events on
-```
-
-**Plugin list in an `if-shell`-sourced file.** tpm only follows plain
-`source` lines when scanning for `@plugin`. If your local config is loaded via
-`if-shell`, declare plugins with the option tpm reads from the server instead:
-
-```tmux
-set -g @tpm_plugins '           \
-  tmux-plugins/tpm              \
-  tmux-plugins/tmux-resurrect   \
-  tmux-plugins/tmux-continuum   \
-  timvw/tmux-assistant-resurrect \
-  jward7/tmux-agent-signal      \
-'
-run -b '~/.tmux/plugins/tpm/tpm'
-```
-
-**Sounds over SSH.** Sounds play on the machine running tmux. For a remote
-tmux, turn on `@agent_signal_bell` and let your terminal handle the bell, or
-`@agent_signal_notify` with an OSC-aware terminal and `allow-passthrough`.
-
-## How it compares
-
-All of these are good projects under active development, so this is a
-snapshot as of **2026-09-07**, agent rows re-checked **2026-10-25**.
-[workmux](https://github.com/raine/workmux) is left out because it is a
-worktree manager with a status layer, not a status plugin, but several of
-this plugin's integrations were corrected against its. tmux-agent-state is the closest relative:
-the same hook-driven, no-daemon design, without the triage, switcher and
-summary layers. 🟢 has it, 🟡 partial or optional, 🔴 does not,
-▫️ not applicable. Corrections welcome.
-
-| | tmux-agent-signal | [tmux-agent-state](https://github.com/cburmeister/tmux-agent-state) | [samleeney/tmux-agent-status](https://github.com/samleeney/tmux-agent-status) | [gentle-agent-state](https://github.com/Gentleman-Programming/gentle-agent-state) | [RatulMaharaj/tmux-agent-status](https://github.com/RatulMaharaj/tmux-agent-status) | [herdr](https://github.com/herdrdev/herdr) |
-|---|---|---|---|---|---|---|
-| Stays inside tmux | 🟢 | 🟢 | 🟢 | 🟢 also Zellij, Ghostty | 🟢 | 🔴 replaces tmux |
-| State source | 🟢 hooks | 🟢 hooks | 🟢 hooks | 🟢 hooks | 🔴 polls `ps` and screen text | 🟡 hooks for some agents, screen heuristics for Claude and Codex |
-| No daemon or polling | 🟢 | 🟢 | 🔴 collector daemon | 🟢 | 🔴 3 s poller | ▫️ is the server |
-| Works with no hooks installed | 🔴 | 🔴 | 🔴 | 🔴 | 🟢 | 🟢 |
-| Per-window badge | 🟢 | 🟢 | 🟢 | 🟢 | 🟢 | ▫️ sidebar |
-| Tab colour per state | 🟢 | 🟢 | 🔴 | 🔴 marker only | 🟢 | ▫️ |
-| Question vs permission distinguished | 🟢 | 🔴 | 🟡 in an open PR | 🔴 | 🔴 | 🟢 |
-| Done clears when viewed | 🟢 | 🟢 | 🟢 | 🔴 | 🟢 | 🟢 |
-| Jump to next needing you | 🟢 | 🟢 | 🟢 | 🔴 | 🔴 | 🟢 |
-| Wait / park triage | 🟢 | 🔴 | 🟢 | 🔴 | 🔴 | 🔴 |
-| Switcher with close actions | 🟢 fzf popup | 🔴 | 🟢 sidebar + popup | 🔴 | 🔴 | 🟢 |
-| Fleet summary in status bar | 🟢 | 🔴 | 🟢 | 🔴 | 🟡 badges only | 🟢 |
-| Sounds | 🟢 | 🟡 bell; bring your own notifier | 🟢 | 🟢 | 🟢 | 🟢 |
-| Background task awareness | 🟢 | 🔴 | 🟢 | 🔴 | 🔴 | ▫️ |
-| Claude Code | 🟢 plugin or hooks | 🟢 plugin install | 🟢 | 🟢 | 🟢 | 🟢 |
-| Codex CLI | 🟡 from docs | 🟡 done only | 🟢 | 🟢 | 🟡 presence only | 🟢 |
-| Pi / OpenCode | 🟡 from docs / 🟡 from docs | 🟡 no confirmation prompts / 🟢 | 🔴 / 🔴 | 🟢 / 🟢 | 🔴 / 🟡 presence only | 🟢 |
-| Gemini CLI / Copilot CLI | 🟡 from docs / 🟡 from docs | 🟢 / 🟢 | 🔴 / 🟡 custom status file | 🔴 | 🔴 | 🔴 |
-| Grok CLI / Antigravity CLI | 🟡 from workmux's hooks / 🟡 from workmux's hooks | 🔴 | 🔴 | 🔴 | 🔴 | 🟢 / 🔴 |
-| Agent-to-agent API | 🔴 | 🔴 | 🔴 | 🔴 | 🔴 | 🟢 socket API |
-| Survives lid close / restart without resume | 🔴 use resurrect | 🔴 | 🔴 | 🔴 | 🔴 | 🟢 |
-| Tests in repo | 🟢 | 🟢 | 🟢 | 🟢 | 🔴 | 🟢 |
-| Licence | MIT | MIT | none stated | MIT | MIT | Apache-2.0 |
-
-If you want detection with nothing installed in the agent, or agents that talk
-to each other, herdr is the right tool and this plugin is not trying to be it.
-If you want to stay in your tmux setup with hooks doing the work, this plugin
-is the smallest option that still covers triage and navigation.
-
-## How it works
-
-```
-Claude hook ──> agent-signal hook Stop ──> tmux set -p @agent_pane_state done
-                                        └─> recompute window: @agent_state, @agent_since,
-                                            @agent_icon, @agent_fg, window-status-style
-                                        └─> recompute @agent_summary, @agent_needs
-                                        └─> not on screen? play sound
-window-status-format reads #{@agent_icon} / #{@agent_fg}
-status-right reads #{@agent_summary}
-after-select-window / client-focus-in hook ──> agent-signal seen <window> ──> done -> idle
-```
-
-Claude runs hooks concurrently, so each update takes a lock keyed on the
-server socket and window id (a `mkdir` in `$TMPDIR`, reclaimed if a holder
-was killed) before reading and rewriting the window's state.
-
-`@agent_since` records when a window's aggregate state last changed, and
-`next` uses it to serve the longest wait first within a tier.
-
-Per-pane state lets several agents share a window. The window shows the most
-urgent pane. Pane state is stored under `@agent_pane_state`, a different name
-from the window's `@agent_state`, because pane options inherit from the window
-in tmux formats and would otherwise read back the aggregate.
-
-The plugin only ever touches a window's `window-status-style` when it set it,
-tracked with `@agent_tab_owned`, so a style you or a theme put on a window
-survives. Key bindings are skipped, with a message, when the key is already
-bound to something else.
-
-`agent-signal sync` reads Claude Code's own session registry
-(`~/.claude/sessions/*.json`, which records each session's tmux pane and
-display name) to label panes. It runs on `SessionStart`, when the plugin
-loads, and when the switcher opens.
+- [Command reference](docs/commands.md): every subcommand, the Claude hook
+  mapping, nesting agents, uninstall.
+- [Recommended setup](docs/recommended-setup.md): resurrecting agents after a
+  tmux restart, naming Claude sessions, the tmux settings Claude Code wants.
+- [How it compares](docs/comparison.md): feature table against
+  tmux-agent-state, the two tmux-agent-status projects, gentle-agent-state and
+  herdr.
+- [How it works](docs/how-it-works.md): the option names, the lock, the
+  seen hook.
+- [Troubleshooting](docs/troubleshooting.md)
 
 ## Development
 
 ```sh
 sh test/run.sh              # every test/t-*.sh, each on its own isolated tmux server, in parallel
-sh test/run.sh -j 1         # serial
 sh test/run.sh hooks next   # just those features
-sh test/t-hooks.sh          # one file on its own; KEEP=1 leaves its server up to poke at
 sh scripts/lint.sh          # shellcheck, checkbashisms and a function-size check, as CI runs them
-sh docs/demo.sh             # throwaway server showing every state; tmux -L demo attach
 ```
 
+**Regenerating the demo GIF.** `sh docs/record-demo.sh` rebuilds
+`docs/demo.gif` from the demo server: it respawns the panes with a plain `sh`
+so nothing from your own shell shows, walks the states on a timer, records
+with [asciinema](https://github.com/asciinema/asciinema) and converts with
+[agg](https://github.com/asciinema/agg). Install notes, including prebuilt
+binaries for Macs without Homebrew bottles, are at the top of the script.
+Re-run it whenever a badge, colour or the status line changes.
+
 Tests are real: each file starts a fresh server, loads the plugin, pipes hook
-JSON through the real script and asserts on tmux options. `test/lib.sh` holds
-the fixture and helpers. CI runs lint and the suite on Ubuntu and macOS.
-
-## Troubleshooting
-
-- **Nothing changes.** Run `agent-signal check` inside a pane: it says what is
-  and is not wired. If everything is ok there, run `agent-signal set blocked`;
-  if the tab changes, tmux is fine and the hooks are not firing, so check
-  `~/.claude/settings.json` and open `/hooks` in Claude to reload. If even
-  `set blocked` does nothing, make sure `AGENT_SIGNAL_DISABLE` is not set in
-  that shell; for hooks, `CLAUDE_JOB_DIR` has the same effect.
-- **Copy-mode keys or plugin hooks stop working during a Homebrew tmux
-  upgrade.** Homebrew unlinks `tmux` from `/usr/local/bin` while it builds.
-  Plugins that shell out to `tmux` (tmux-yank, tmux-copycat) fail until it is
-  relinked. This plugin looks for the Cellar binary as a fallback, so it keeps
-  working until brew deletes the old version, at which point see the next
-  item. Wait for brew to finish, or `brew link tmux`.
-- **Icons render as boxes or gaps.** Your font lacks ✓ or …. Set
-  `@agent_signal_ascii on`, or give each state your own icon.
-- **New windows or splits die instantly after a Homebrew tmux upgrade.** The
-  new client cannot spawn panes on the old, still-running server. Save with
-  resurrect, `tmux kill-server`, start tmux again, and let continuum restore.
-- **The badge does not appear with a theme.** Load this plugin after the
-  theme. The badge is appended to whatever `window-status-format` is set when
-  the plugin loads.
-- **A dead pane's glyph lingers** in the fleet summary on tmux 3.4 (Ubuntu
-  24.04). That tmux only notices a pane has died on its next child exit, so
-  the glyph goes on the next hook or `agent-signal summary`. tmux 3.5 and
-  later fixed this.
-- **`next` says nothing needs you** while a tab is orange or pink: the
-  window is on `wait` or `park`. `prefix + W` / `prefix + P` clears it.
+JSON through the real script and asserts on tmux options. The integrations
+for agents other than Claude Code were written from vendor docs and are not
+exercised against the real agents here, so reports from people who run them
+are the most useful contribution.
 
 ## License
 

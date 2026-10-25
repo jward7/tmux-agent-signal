@@ -2,6 +2,11 @@
 
 ## Unreleased
 
+- README rewritten around a logo, tagline and a recorded GIF of the states
+  changing; the configuration, command, comparison, setup, internals and
+  troubleshooting sections moved to `docs/`. `docs/record-demo.sh` regenerates
+  the GIF with asciinema and agg.
+
 - `sh scripts/lint.sh` runs what CI's lint job runs: shellcheck in POSIX
   mode, checkbashisms (bash-only constructs that break on dash), and a check
   that no function in `bin/agent-signal` exceeds 60 lines. The test files

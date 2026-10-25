@@ -6,7 +6,7 @@
 #                  single-file layout stays readable without splitting it
 set -u
 cd "$(dirname "$0")/.." || exit 1
-FILES="bin/agent-signal scripts/switcher.sh scripts/lint.sh agent-signal.tmux docs/demo.sh test/run.sh test/lib.sh"
+FILES="bin/agent-signal scripts/switcher.sh scripts/lint.sh agent-signal.tmux docs/demo.sh docs/record-demo.sh test/run.sh test/lib.sh"
 for f in test/t-*.sh; do FILES="$FILES $f"; done
 MAX_FN=${MAX_FN:-60}
 rc=0

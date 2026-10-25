@@ -1,0 +1,17 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="520" height="200" viewBox="0 0 520 200" font-family="ui-monospace, SFMono-Regular, Menlo, Consolas, monospace">
+  <!-- a tmux status line: five windows, three of them need you -->
+  <rect x="60" y="28" width="400" height="44" rx="8" fill="#3a3f47"/>
+  <g font-size="19" font-weight="700" text-anchor="middle">
+    <rect x="72" y="35" width="66" height="30" rx="5" fill="#d9472b"/>
+    <text x="105" y="56" fill="#ffffff">1 ✳</text>
+    <rect x="146" y="35" width="66" height="30" rx="5" fill="#ff8700"/>
+    <text x="179" y="56" fill="#1a1a1a">2 !</text>
+    <rect x="220" y="35" width="66" height="30" rx="5" fill="#4cc24c"/>
+    <text x="253" y="56" fill="#1a1a1a">3 ✓</text>
+    <rect x="294" y="35" width="66" height="30" rx="5" fill="#ff87ff"/>
+    <text x="327" y="56" fill="#1a1a1a">4 ?</text>
+    <text x="410" y="56" fill="#c9d1d9">5 ~</text>
+  </g>
+  <text x="260" y="132" font-size="46" font-weight="700" text-anchor="middle" fill="#e6edf3" letter-spacing="-1">tmux-agent-signal</text>
+  <text x="260" y="170" font-size="17" text-anchor="middle" fill="#e6edf3" opacity="0.72">which agent needs you, in the window list</text>
+</svg>
