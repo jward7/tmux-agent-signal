@@ -27,6 +27,10 @@ hook "$P_API" PostToolUse '{"tool_name":"AskUserQuestion"}'
 is "PostToolUse -> working"          "$(wst "$W_API")" working
 hook "$P_API" PreToolUse '{"tool_name":"ExitPlanMode"}'
 is "PreToolUse ExitPlanMode stays working (its PermissionRequest flags it)" "$(wst "$W_API")" working
+printf '{}' | AGENT_SIGNAL_DISABLE=1 TMUX_PANE=$P_API "$AS" hook PermissionRequest
+is "AGENT_SIGNAL_DISABLE silences a nested agent's hooks" "$(wst "$W_API")" working
+printf '{}' | AGENT_SIGNAL_DISABLE=1 TMUX_PANE=$P_API "$AS" set blocked; rc=$?
+is "AGENT_SIGNAL_DISABLE exits 0 so the agent never notices" "$rc" 0
 hook "$P_API" PermissionRequest
 is "PermissionRequest -> blocked"    "$(wst "$W_API")" blocked
 is "blocked colours the tab"         "$(wstyle "$W_API")" "fg=black,bg=colour208,bold"

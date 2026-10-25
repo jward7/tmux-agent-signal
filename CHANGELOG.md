@@ -2,6 +2,9 @@
 
 ## Unreleased
 
+- `AGENT_SIGNAL_DISABLE=1` in an agent's environment makes every report from
+  it a no-op, so an agent launched inside another agent's pane does not
+  overwrite its parent's state.
 - A `SessionStart` fired by auto-compaction no longer resets a working pane to
   idle mid-turn. The hook files match only `startup|resume|clear|fork`, and the
   script ignores the `compact` source for hooks installed before this change.

@@ -326,6 +326,9 @@ bootstrap_if_needed() {
 }
 
 set_state() { # set_state <state> [pane]
+  # An agent launched from inside another agent's pane would report over its
+  # parent. AGENT_SIGNAL_DISABLE=1 on the nested command keeps it quiet.
+  [ -z "${AGENT_SIGNAL_DISABLE:-}" ] || return 0
   bootstrap_if_needed
   pane=$(resolve_pane "${2:-}"); EVENT_PANE=$pane
   win=$(window_of "$pane") || exit 0
