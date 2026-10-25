@@ -17,4 +17,31 @@ drive_done "$P_API"
 # No client is attached to the test server, so nobody is "looking": done must show.
 is "finishing in the active window of a detached session still shows done" "$(wst "$W_API")" done
 
+# `seen` with no argument acts on the current window: api is current (and
+# done, as just shown), web is done in the background and must stay so.
+unset TMUX_PANE   # an outer tmux's pane id must not steer "current"
+hook "$P_WEB" Stop
+"$AS" seen
+is "seen with no argument clears the current window" "$(wst "$W_API")" ""
+is "seen with no argument leaves other windows alone" "$(wst "$W_WEB")" done
+
+# Every done pane in the window is acknowledged, not just one.
+hook "$P_WEB2" Stop
+"$AS" seen "$W_WEB"
+is "seen clears every done pane in the window" "$(pst "$P_WEB")|$(pst "$P_WEB2")|$(wst "$W_WEB")" "||"
+
+# A blocked pane is a wait, not a finish: viewing does not acknowledge it.
+hook "$P_WEB" Stop; hook "$P_WEB2" PermissionRequest
+"$AS" seen "$W_WEB"
+is "seen leaves a blocked pane in the window blocked" "$(pst "$P_WEB2")|$(wst "$W_WEB")" "blocked|blocked"
+hook "$P_WEB" SessionEnd; hook "$P_WEB2" SessionEnd
+
+# Attaching a client lands it on the session's current window: the
+# client-attached hook acknowledges a done waiting there.
+drive_done "$P_API"
+is "before the client attaches, api is done" "$(wst "$W_API")" done
+attach_client main
+waitfor "$W_API" ""
+is "attaching a client clears done on the window it lands on (client-attached hook)" "$(wst "$W_API")" ""
+
 finish

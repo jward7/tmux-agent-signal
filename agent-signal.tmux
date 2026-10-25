@@ -38,6 +38,10 @@ case $cur in *@agent_summary*) ;; *) t set-option -g status-right "#{@agent_summ
 
 # --- outer terminal title: "[2 need you] session:window" ---------------------
 if [ "$(opt @agent_signal_title off)" = on ]; then
+  # Remember what was there (once) so uninstall can put it back.
+  if [ -z "$(t show-options -gq @agent_title_saved)" ]; then
+    t set-option -g @agent_title_saved "$(t show-option -gv set-titles) $(t show-option -gv set-titles-string)"
+  fi
   t set-option -g set-titles on
   t set-option -g set-titles-string "$(opt @agent_signal_title_format '#{?@agent_needs,[#{@agent_needs} need you] ,}#S:#W')"
 fi
@@ -70,8 +74,9 @@ for h in after-select-window client-session-changed client-attached client-focus
   t set-hook -g "${h}[91]" "run-shell -b '$AS seen #{window_id}'"
 done
 
-# Panes going away change the summary too.
-for h in pane-exited after-kill-pane window-unlinked; do
+# Panes going away change the summary too (pane-died is the remain-on-exit
+# form of pane-exited).
+for h in pane-exited pane-died after-kill-pane window-unlinked; do
   t set-hook -g "${h}[91]" "run-shell -b '$AS summary'"
 done
 

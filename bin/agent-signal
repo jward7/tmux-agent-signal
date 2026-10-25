@@ -550,7 +550,8 @@ check() {
   if [ "$(t show-option -gqv @agent_signal_command)" = "$SELF" ]; then say ok "command path published"; else say fail "@agent_signal_command not published: source agent-signal.tmux"; fi
   case $(t show-option -gv window-status-format) in *@agent_icon*) say ok "badge in window-status-format" ;; *) say fail "badge missing from window-status-format" ;; esac
   case $(t show-option -gv status-right) in *@agent_summary*) say ok "summary in status-right" ;; *) say warn "summary not in status-right" ;; esac
-  n=$(t show-hooks -g | grep -c "agent-signal"); if [ "$n" -ge 5 ]; then say ok "$n hooks installed"; else say fail "only $n of 5 hooks installed"; fi
+  # Pane hooks (pane-exited, pane-died) are stored at window scope.
+  n=$( { t show-hooks -g; t show-hooks -gw; } 2>/dev/null | grep -c "agent-signal"); if [ "$n" -ge 8 ]; then say ok "$n hooks installed"; else say fail "only $n of 8 hooks installed"; fi
   for k in next switcher wait park; do
     case $k in next) d=N ;; switcher) d=A ;; wait) d=W ;; park) d=P ;; esac
     key=$(opt_set "@agent_signal_key_$k" "$d")
@@ -577,14 +578,26 @@ uninstall() {
     esac
     [ "$new" != "$cur" ] && t set-option -g "$o" "$new"
   done
-  for h in after-select-window client-session-changed client-attached client-focus-in pane-exited after-kill-pane window-unlinked; do
+  for h in after-select-window client-session-changed client-attached client-focus-in pane-exited pane-died after-kill-pane window-unlinked; do
     t set-hook -gu "${h}[91]" 2>/dev/null
   done
+  # The outer-terminal title, if the entry file turned it on.
+  saved=$(t show-option -gqv @agent_title_saved)
+  if [ -n "$saved" ]; then
+    t set-option -g set-titles "${saved%% *}"
+    t set-option -g set-titles-string "${saved#* }"
+    t set-option -gu @agent_title_saved
+  fi
   for k in "$(opt_set @agent_signal_key_next N)" "$(opt_set @agent_signal_key_switcher A)" "$(opt_set @agent_signal_key_wait W)" "$(opt_set @agent_signal_key_park P)"; do
     [ -n "$k" ] && t list-keys -T prefix | awk -v k="$k" '$4 == k' | grep -q agent-signal && t unbind-key -T prefix "$k"
   done
   for w in $(t list-windows -a -F '#{window_id}'); do
     restore_tab "$w"
+    # A badge woven into a per-window format by mend_window_format.
+    for o in window-status-format window-status-current-format; do
+      cur=$(t show-option -wqv -t "$w" "$o")
+      case $cur in *"$BADGE"*) t set-option -w -t "$w" "$o" "${cur%"$BADGE"}" ;; esac
+    done
     t set-option -uw -t "$w" @agent_state \; set-option -uw -t "$w" @agent_since \; set-option -uw -t "$w" @agent_hold \; set-option -uw -t "$w" @agent_icon \; set-option -uw -t "$w" @agent_fg \; set-option -uw -t "$w" @agent_tab_saved
   done
   for p in $(t list-panes -a -F '#{pane_id}'); do

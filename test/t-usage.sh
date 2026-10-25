@@ -17,7 +17,7 @@ is "check exits 0 on a wired server"           "$rc" 0
 TMUX='' "$AS" check >/dev/null 2>&1; rc=$?
 is "check without TMUX exits 1 (it used to exit 0 silently)" "$rc" 1
 is "check without TMUX says why"               "$(TMUX='' "$AS" check 2>&1 | grep -c 'TMUX is not set')" 1
-is "check reports the hooks"                    "$(printf '%s\n' "$out" | grep -c 'hooks installed')" 1
+is "check reports the hooks"                    "$(printf '%s\n' "$out" | grep -c 'ok   8 hooks installed')" 1
 "$AS" uninstall >/dev/null
 "$AS" check >/dev/null 2>&1; rc=$?
 is "check exits 1 after uninstall"              "$rc" 1

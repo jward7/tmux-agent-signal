@@ -20,6 +20,13 @@ Bugs found by a test-coverage audit, each now pinned by a test.
 - The no-jq fallback took the last occurrence of a key, so a `tool_name`
   nested in `tool_input` beat the top-level one, and it read a tab-only
   `background_tasks` array as non-empty, leaving the pane working after Stop.
+- `uninstall` now also takes the badge out of a per-window format it mended,
+  and puts `set-titles` and `set-titles-string` back to what they were before
+  `@agent_signal_title on` changed them.
+- A pane that dies under `remain-on-exit` (`pane-died`) refreshes the summary
+  like a pane that exits, so its glyph and needs-you count do not linger.
+  `check` counts the pane hooks too (tmux stores them at window scope) and
+  expects all eight.
 - Tests: every hook event and argument edge case, the Claude session registry
   against a fake `$HOME`, every integration hook command executed against a
   live server, installer edge cases, and more of the no-jq fallback.
