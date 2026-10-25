@@ -17,6 +17,12 @@ Bugs found by a test-coverage audit, each now pinned by a test.
   is coloured.
 - `check` run outside tmux reports "TMUX is not set" and exits 1 instead of
   exiting 0 silently.
+- The no-jq fallback took the last occurrence of a key, so a `tool_name`
+  nested in `tool_input` beat the top-level one, and it read a tab-only
+  `background_tasks` array as non-empty, leaving the pane working after Stop.
+- Tests: every hook event and argument edge case, the Claude session registry
+  against a fake `$HOME`, every integration hook command executed against a
+  live server, installer edge cases, and more of the no-jq fallback.
 
 ## 0.4.1 (2026-10-25)
 

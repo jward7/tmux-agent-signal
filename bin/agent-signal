@@ -74,7 +74,9 @@ json_get() { # json_get <jq-filter> <sed-key-fallback>: a string value by key
     printf '%s' "$JSON" | jq -r "$1 // empty" 2>/dev/null
   else
     # First occurrence of "key": "value", tolerating whitespace around the colon.
-    printf '%s' "$JSON" | tr -d '\n' | sed -n "s/.*\"$2\"[[:space:]]*:[[:space:]]*\"\([^\"]*\)\".*/\1/p" | head -1
+    # grep -o isolates each match, so the first one is the top-level key rather
+    # than, as a greedy sed substitution would give, the last (a nested one).
+    printf '%s' "$JSON" | tr -d '\n' | grep -o "\"$2\"[[:space:]]*:[[:space:]]*\"[^\"]*\"" | head -1 | sed 's/^[^:]*:[[:space:]]*"\(.*\)"$/\1/'
   fi
 }
 
@@ -82,7 +84,8 @@ json_array_nonempty() { # json_array_nonempty <jq-path> <key>: 0 if the array ha
   if command -v jq >/dev/null 2>&1; then
     [ "$(printf '%s' "$JSON" | jq -r "($1 // []) | length" 2>/dev/null)" -gt 0 ] 2>/dev/null
   else
-    printf '%s' "$JSON" | tr -d '\n' | grep -q "\"$2\"[[:space:]]*:[[:space:]]*\[[[:space:]]*[^]\t ]"
+    # An element is anything after the bracket that is neither ] nor blank.
+    printf '%s' "$JSON" | tr -d '\n' | grep -q "\"$2\"[[:space:]]*:[[:space:]]*\[[[:space:]]*[^][:space:]]"
   fi
 }
 
