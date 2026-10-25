@@ -1,52 +1,62 @@
 # Changelog
 
-## Unreleased
+## 0.4.0 (2026-10-25)
 
-- `next` serves the window that has waited longest within a tier (blocked,
-  then ask, then done) instead of the next one by index. Each window records
-  when its state last changed in `@agent_since`.
-- Integrations for Grok CLI and Antigravity CLI (`agy`), from workmux's
-  shipped hooks.
-- Integrations refreshed against workmux's, which its users run: Gemini's
-  `Notification` hook matches only `ToolPermission`; Pi does not report done
-  after an aborted turn it will continue from; OpenCode derives the word from
-  every session it serves and gains a plugin API v2 (TUI) variant. All stay
-  silent without `TMUX_PANE`.
-- Codex CLI integration rewritten on Codex's hooks (`[features] hooks = true`):
-  working, blocked and done instead of done only, with subagent events kept
-  as working so a child finishing does not mark the turn done.
-- A report with no pane given and no `TMUX_PANE` in the environment is
-  attributed by process ancestry (the pane whose shell is an ancestor of the
-  hook) rather than to the client's active pane, which was the wrong window
-  whenever you were looking elsewhere.
-- Hooks fired by a Claude background job (`CLAUDE_JOB_DIR` set) are ignored,
-  so a job finishing in the background no longer marks the interactive pane
-  done or working.
-- `AGENT_SIGNAL_DISABLE=1` in an agent's environment makes every report from
-  it a no-op, so an agent launched inside another agent's pane does not
-  overwrite its parent's state.
-- A `SessionStart` fired by auto-compaction no longer resets a working pane to
-  idle mid-turn. The hook files match only `startup|resume|clear|fork`, and the
-  script ignores the `compact` source for hooks installed before this change.
-- The per-window lock key no longer needs `cksum` or `cut` on PATH: the server
-  socket path is flattened in plain shell. A hook run from a trimmed PATH used
-  to print "cksum: command not found" and key every server's locks the same.
-- `attach_client` in `test/lib.sh` borrows a pseudo-terminal from a second,
-  throwaway tmux server instead of `script(1)`, and feeds it focus reports with
-  `send-keys -H`. BSD `script` on the macOS CI runner refused the FIFO it was
-  given for stdin and the first write then hung `t-focus.sh`; a client that
-  fails to attach is now a failed assertion with the terminal server's output.
+Learnings from a read of [workmux](https://github.com/raine/workmux), whose
+status-tracking layer has been through a long tail of user-reported fixes.
+
+**Behaviour**
+
 - "On screen" now needs a focused client showing the window, not just an
   attached session. With one session per terminal tab every session is
   attached, so a turn finishing in a background tab went straight to idle
   and never showed `done` or alerted. Focus comes from the terminal's focus
   reports (`focus-events on`); a terminal that never reports focus keeps the
-  old behaviour.
-- A `client-focus-in` hook clears `done` when you switch back to the
-  terminal tab showing that window.
-- Tests can attach a real client on a pseudo-terminal and drive its focus
-  (`attach_client`, `focus` in `test/lib.sh`); `t-focus.sh` covers the
-  on-screen check, which had no client-side test before.
+  old behaviour. A `client-focus-in` hook clears `done` when you switch back
+  to the terminal tab showing that window.
+- `next` serves the window that has waited longest within a tier (blocked,
+  then ask, then done) instead of the next one by index. Each window records
+  when its state last changed in `@agent_since`.
+
+**Claude Code hooks**
+
+- A `SessionStart` fired by auto-compaction no longer resets a working pane to
+  idle mid-turn. The hook files match only `startup|resume|clear|fork`, and the
+  script ignores the `compact` source for hooks installed before this change.
+- Hooks fired by a Claude background job (`CLAUDE_JOB_DIR` set) are ignored,
+  so a job finishing in the background no longer marks the interactive pane
+  done or working.
+- A report with no pane given and no `TMUX_PANE` in the environment is
+  attributed by process ancestry (the pane whose shell is an ancestor of the
+  hook) rather than to the client's active pane, which was the wrong window
+  whenever you were looking elsewhere.
+- `AGENT_SIGNAL_DISABLE=1` in an agent's environment makes every report from
+  it a no-op, so an agent launched inside another agent's pane does not
+  overwrite its parent's state.
+
+**Other agents**
+
+- Codex CLI integration rewritten on Codex's hooks (`[features] hooks = true`):
+  working, blocked and done instead of done only, with subagent events kept
+  as working so a child finishing does not mark the turn done.
+- Integrations for Grok CLI and Antigravity CLI (`agy`), from workmux's
+  shipped hooks.
+- Gemini, Pi and OpenCode refreshed against workmux's, which its users run:
+  Gemini's `Notification` hook matches only `ToolPermission`; Pi does not
+  report done after an aborted turn it will continue from; OpenCode derives
+  the word from every session it serves and gains a plugin API v2 (TUI)
+  variant. All stay silent without `TMUX_PANE`.
+
+**Internals and tests**
+
+- The per-window lock key no longer needs `cksum` or `cut` on PATH: the server
+  socket path is flattened in plain shell. A hook run from a trimmed PATH used
+  to print "cksum: command not found" and key every server's locks the same.
+- Tests can attach a real client and drive its focus (`attach_client`, `focus`
+  in `test/lib.sh`), borrowing a pseudo-terminal from a second throwaway tmux
+  server rather than `script(1)`, which on the macOS runner refused a FIFO for
+  stdin and hung. `t-focus.sh` covers the on-screen check and `t-pane.sh` the
+  pane resolution paths.
 
 ## 0.3.0 (2026-09-07)
 
