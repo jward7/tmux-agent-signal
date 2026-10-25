@@ -442,6 +442,10 @@ the fixture and helpers. CI runs lint and the suite on Ubuntu and macOS.
 - **The badge does not appear with a theme.** Load this plugin after the
   theme. The badge is appended to whatever `window-status-format` is set when
   the plugin loads.
+- **A dead pane's glyph lingers** in the fleet summary on tmux 3.4 (Ubuntu
+  24.04). That tmux only notices a pane has died on its next child exit, so
+  the glyph goes on the next hook or `agent-signal summary`. tmux 3.5 and
+  later fixed this.
 - **`next` says nothing needs you** while a tab is orange or pink: the
   window is on `wait` or `park`. `prefix + W` / `prefix + P` clears it.
 

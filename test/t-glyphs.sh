@@ -70,6 +70,10 @@ T send-keys -t "$P_D" C-d   # cat reads EOF and exits
 waitcmd 1 T display -p -t "$P_D" '#{pane_dead}'
 is "its process exited, the pane remains (dead)" "$(T display -p -t "$P_D" '#{pane_dead}')" 1
 waitcmd "" gsum
+# tmux 3.4 only collects a dead pane's exit status, and so only fires
+# pane-died, on its next SIGCHLD; 3.5 signals itself (server_destroy_pane).
+# One throwaway job supplies that SIGCHLD. Any later tmux has fired by now.
+if [ -n "$(gsum)" ]; then T run-shell -b true; waitcmd "" gsum; echo "  note tmux $(T display -p '#{version}') fired pane-died only after another child exited"; fi
 is "the pane-died hook drops a dead pane's glyph" "$(gsum)" ""
 is "and its needs-you count"            "$(gneeds)" ""
 
