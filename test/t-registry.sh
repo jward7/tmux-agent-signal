@@ -3,7 +3,7 @@
 # each naming its pane as session_name:window_id.pane_id). HOME is pointed at
 # a private directory on every call, never at the real one.
 # shellcheck source-path=SCRIPTDIR source=./lib.sh
-. "$(dirname "$0")/lib.sh"
+HERE=$(dirname "$0"); . "$HERE/lib.sh"
 setup
 
 FAKE="$TMPDIR/home"; REG="$FAKE/.claude/sessions"; mkdir -p "$REG"

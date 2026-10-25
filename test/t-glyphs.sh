@@ -2,7 +2,7 @@
 # The status-right summary per agent kind and state: glyph by AGENT_KIND,
 # colour by pane state, and the needs-you count as windows come and go.
 # shellcheck source-path=SCRIPTDIR source=./lib.sh
-. "$(dirname "$0")/lib.sh"
+HERE=$(dirname "$0"); . "$HERE/lib.sh"
 setup
 unset AGENT_KIND
 HOME=$TMPDIR; export HOME   # SessionStart syncs from ~/.claude/sessions: keep the real one out

@@ -1,7 +1,7 @@
 #!/bin/sh
 # Awkward names: a session name with a space must not break the window scan.
 # shellcheck source-path=SCRIPTDIR source=./lib.sh
-. "$(dirname "$0")/lib.sh"
+HERE=$(dirname "$0"); . "$HERE/lib.sh"
 setup
 
 T rename-session -t main 'my proj'

@@ -3,7 +3,7 @@
 # you, through the first notifier on PATH (terminal-notifier, else osascript,
 # else notify-send). The notifiers are PATH shims that log their argv.
 # shellcheck source-path=SCRIPTDIR source=./lib.sh
-. "$(dirname "$0")/lib.sh"
+HERE=$(dirname "$0"); . "$HERE/lib.sh"
 setup
 
 LOG="$TMPDIR/notify.log"

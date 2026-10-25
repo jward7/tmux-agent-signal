@@ -2,7 +2,7 @@
 # shellcheck disable=SC1010  # bare "done" here is a state name, not a loop keyword
 # The idle reminder Claude sends ~60s after a turn ends, and its exit code.
 # shellcheck source-path=SCRIPTDIR source=./lib.sh
-. "$(dirname "$0")/lib.sh"
+HERE=$(dirname "$0"); . "$HERE/lib.sh"
 setup
 
 # Bring the api window to done, the way the hook tests leave it.

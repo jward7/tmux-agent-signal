@@ -6,13 +6,13 @@ concurrency:
   group: ${{ github.workflow }}-${{ github.ref }}
   cancel-in-progress: true
 jobs:
-  shellcheck:
+  lint:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
-      - run: sudo apt-get update -q && sudo apt-get install -y -q shellcheck
-      - run: shellcheck --version
-      - run: shellcheck -s sh bin/agent-signal scripts/switcher.sh agent-signal.tmux docs/demo.sh test/run.sh test/lib.sh test/t-*.sh
+      - run: sudo apt-get update -q && sudo apt-get install -y -q --no-install-recommends shellcheck devscripts
+      - run: shellcheck --version && checkbashisms --version
+      - run: sh scripts/lint.sh
   test:
     strategy:
       matrix:

@@ -4,7 +4,7 @@
 # SessionStart sources, unknown events) and the edges of `set`, `clear` and
 # `sync`: missing arguments, bad states, missing panes, no tmux, disabled.
 # shellcheck source-path=SCRIPTDIR source=./lib.sh
-. "$(dirname "$0")/lib.sh"
+HERE=$(dirname "$0"); . "$HERE/lib.sh"
 setup
 
 # SessionStart also syncs Claude's registry from $HOME: keep it off the real one.

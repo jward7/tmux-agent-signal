@@ -1,7 +1,7 @@
 #!/bin/sh
 # help, version and the error paths of the command dispatcher.
 # shellcheck source-path=SCRIPTDIR source=./lib.sh
-. "$(dirname "$0")/lib.sh"
+HERE=$(dirname "$0"); . "$HERE/lib.sh"
 setup
 
 out=$("$AS" help); rc=$?

@@ -1,7 +1,7 @@
 #!/bin/sh
 # Claude runs hooks concurrently: two panes of one window must not lose a state.
 # shellcheck source-path=SCRIPTDIR source=./lib.sh
-. "$(dirname "$0")/lib.sh"
+HERE=$(dirname "$0"); . "$HERE/lib.sh"
 setup
 
 # Two hooks for panes in the same window racing: the blocked one must win.

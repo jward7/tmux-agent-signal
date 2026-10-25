@@ -4,7 +4,7 @@
 # each must find the script through @agent_signal_command, report the word its
 # README promises under its own kind, and say nothing (Antigravity: exactly {}).
 # shellcheck source-path=SCRIPTDIR source=./lib.sh
-. "$(dirname "$0")/lib.sh"
+HERE=$(dirname "$0"); . "$HERE/lib.sh"
 setup
 
 kind() { T display -p -t "$1" '#{@agent_kind}'; }

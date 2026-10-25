@@ -2,7 +2,7 @@
 # shellcheck disable=SC1010  # bare "done" here is a state name, not a loop keyword
 # Several panes in one window, and not stepping on a user's or theme's styling.
 # shellcheck source-path=SCRIPTDIR source=./lib.sh
-. "$(dirname "$0")/lib.sh"
+HERE=$(dirname "$0"); . "$HERE/lib.sh"
 setup
 
 T select-window -t "$W_WEB"

@@ -2,7 +2,7 @@
 # A hook killed while holding its window's lock leaves the lock directory
 # behind. The next hook for that window waits ~2s, then reclaims it.
 # shellcheck source-path=SCRIPTDIR source=./lib.sh
-. "$(dirname "$0")/lib.sh"
+HERE=$(dirname "$0"); . "$HERE/lib.sh"
 setup
 
 LOCK=$("$AS" lock-path "$W_API")

@@ -5,7 +5,7 @@
 # attached, but only the focused tab is looked at. A real client on a
 # pseudo-terminal, with focus reported the way a terminal does it.
 # shellcheck source-path=SCRIPTDIR source=./lib.sh
-. "$(dirname "$0")/lib.sh"
+HERE=$(dirname "$0"); . "$HERE/lib.sh"
 setup
 T set-option -g focus-events on
 T select-window -t "$W_API"

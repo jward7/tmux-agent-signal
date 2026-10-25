@@ -1,7 +1,7 @@
 #!/bin/sh
 # The status-right summary: one glyph per agent pane, and the state it clears to.
 # shellcheck source-path=SCRIPTDIR source=./lib.sh
-. "$(dirname "$0")/lib.sh"
+HERE=$(dirname "$0"); . "$HERE/lib.sh"
 setup
 
 hook "$P_WEB2" Stop              # a second agent pane, so the summary has two entries

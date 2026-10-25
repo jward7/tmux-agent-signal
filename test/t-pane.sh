@@ -2,7 +2,7 @@
 # shellcheck disable=SC1010  # bare "done" here is a state name, not a loop keyword
 # Which pane a report lands in when the caller does not say.
 # shellcheck source-path=SCRIPTDIR source=./lib.sh
-. "$(dirname "$0")/lib.sh"
+HERE=$(dirname "$0"); . "$HERE/lib.sh"
 setup
 
 # The client (none attached) and the active window are "shell"; the report

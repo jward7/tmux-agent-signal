@@ -1,7 +1,7 @@
 #!/bin/sh
 # A key binding the user already has is never clobbered; ours is rebound freely.
 # shellcheck source-path=SCRIPTDIR source=./lib.sh
-. "$(dirname "$0")/lib.sh"
+HERE=$(dirname "$0"); . "$HERE/lib.sh"
 setup
 
 "$AS" uninstall >/dev/null

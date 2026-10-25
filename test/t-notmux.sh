@@ -2,7 +2,7 @@
 # With PATH empty the scripts must fall back to a known install path or exit 0,
 # never die on an unbound variable.
 # shellcheck source-path=SCRIPTDIR source=./lib.sh
-. "$(dirname "$0")/lib.sh"
+HERE=$(dirname "$0"); . "$HERE/lib.sh"
 setup
 
 out=$(PATH=/nonexistent /bin/sh "$ROOT/agent-signal.tmux" 2>&1); rc=$?

@@ -1,5 +1,13 @@
 # Changelog
 
+## Unreleased
+
+- `sh scripts/lint.sh` runs what CI's lint job runs: shellcheck in POSIX
+  mode, checkbashisms (bash-only constructs that break on dash), and a check
+  that no function in `bin/agent-signal` exceeds 60 lines. The test files
+  source `lib.sh` through a variable so checkbashisms does not misread the
+  line as a sourced script with arguments.
+
 ## 0.4.2 (2026-10-25)
 
 Bugs found by a test-coverage audit, each now pinned by a test. The suite

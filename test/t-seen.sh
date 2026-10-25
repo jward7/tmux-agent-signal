@@ -3,7 +3,7 @@
 # Viewing a window acknowledges it: the after-select-window hook, an explicit
 # window argument, and the "nobody is looking" case of a detached session.
 # shellcheck source-path=SCRIPTDIR source=./lib.sh
-. "$(dirname "$0")/lib.sh"
+HERE=$(dirname "$0"); . "$HERE/lib.sh"
 setup
 
 drive_done "$P_API"

@@ -1,7 +1,7 @@
 #!/bin/sh
 # `install-claude-hooks` merging into an existing ~/.claude/settings.json.
 # shellcheck source-path=SCRIPTDIR source=./lib.sh
-. "$(dirname "$0")/lib.sh"
+HERE=$(dirname "$0"); . "$HERE/lib.sh"
 setup_env
 
 FIX=$(mktemp -d); mkdir -p "$FIX/.claude"

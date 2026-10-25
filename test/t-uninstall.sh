@@ -1,7 +1,7 @@
 #!/bin/sh
 # `uninstall` is the exact inverse of the entry file, and reinstall works after it.
 # shellcheck source-path=SCRIPTDIR source=./lib.sh
-. "$(dirname "$0")/lib.sh"
+HERE=$(dirname "$0"); . "$HERE/lib.sh"
 setup
 
 T set-option -g @agent_signal_title on; sh "$ROOT/agent-signal.tmux"   # set-titles on, our format

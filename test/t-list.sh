@@ -2,7 +2,7 @@
 # shellcheck disable=SC1010  # bare "done" here is a state name, not a loop keyword
 # `agent-signal list`, the tree the switcher popup renders.
 # shellcheck source-path=SCRIPTDIR source=./lib.sh
-. "$(dirname "$0")/lib.sh"
+HERE=$(dirname "$0"); . "$HERE/lib.sh"
 setup
 
 hook "$P_API" UserPromptSubmit   # api: working (a marked window)

@@ -1,7 +1,7 @@
 #!/bin/sh
 # prefix+N: jump to the next window that needs you, skipping parked ones.
 # shellcheck source-path=SCRIPTDIR source=./lib.sh
-. "$(dirname "$0")/lib.sh"
+HERE=$(dirname "$0"); . "$HERE/lib.sh"
 setup
 
 T select-window -t "$W_API"

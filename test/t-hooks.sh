@@ -4,7 +4,7 @@
 # No client is attached to this server, so nobody is looking at any window:
 # "done" is always flagged, never auto-acknowledged.
 # shellcheck source-path=SCRIPTDIR source=./lib.sh
-. "$(dirname "$0")/lib.sh"
+HERE=$(dirname "$0"); . "$HERE/lib.sh"
 setup
 
 hook "$P_API" SessionStart

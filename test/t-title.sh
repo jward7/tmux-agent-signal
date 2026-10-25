@@ -3,7 +3,7 @@
 # points it at the needs-you count, or at a format of your own. Off, it leaves
 # set-titles alone.
 # shellcheck source-path=SCRIPTDIR source=./lib.sh
-. "$(dirname "$0")/lib.sh"
+HERE=$(dirname "$0"); . "$HERE/lib.sh"
 setup
 
 DEFAULT_FMT='#{?@agent_needs,[#{@agent_needs} need you] ,}#S:#W'

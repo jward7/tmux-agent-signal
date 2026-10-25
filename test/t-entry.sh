@@ -1,7 +1,7 @@
 #!/bin/sh
 # The entry file: badge and summary formats, key bindings, hooks, idempotency.
 # shellcheck source-path=SCRIPTDIR source=./lib.sh
-. "$(dirname "$0")/lib.sh"
+HERE=$(dirname "$0"); . "$HERE/lib.sh"
 setup
 
 case $(T show-option -gv window-status-format) in

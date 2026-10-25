@@ -3,7 +3,7 @@
 # so monitor-bell flags the window (and an SSH'd terminal hears it). A finish
 # does not ring, and with the option off nothing does.
 # shellcheck source-path=SCRIPTDIR source=./lib.sh
-. "$(dirname "$0")/lib.sh"
+HERE=$(dirname "$0"); . "$HERE/lib.sh"
 setup
 
 bflag() { T display -p -t "$1" '#{window_bell_flag}'; }
