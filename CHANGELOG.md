@@ -2,6 +2,8 @@
 
 ## Unreleased
 
+- Integrations for Grok CLI and Antigravity CLI (`agy`), from workmux's
+  shipped hooks.
 - Integrations refreshed against workmux's, which its users run: Gemini's
   `Notification` hook matches only `ToolPermission`; Pi does not report done
   after an aborted turn it will continue from; OpenCode derives the word from

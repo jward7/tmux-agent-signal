@@ -20,6 +20,8 @@ nothing, so a broken indicator can never block an agent.
 | [Copilot CLI](copilot/) | hooks file | yes | yes | | yes | from the docs, not exercised here |
 | [OpenCode](opencode/) | plugin (API v1 or v2) | yes | yes | | yes | from the docs, not exercised here |
 | [Pi](pi/) | extension | yes | | yes | yes | from the docs, not exercised here |
+| [Grok CLI](grok/) | hooks file | yes | yes | | yes | from workmux's hooks, not exercised here |
+| [Antigravity CLI](antigravity/) | hooks in `~/.gemini/config/hooks.json` | yes | | | yes | from workmux's hooks, not exercised here |
 
 "From the docs" means the mapping was written against the vendor's published
 hook or plugin reference, in September 2026, by someone who does not run that

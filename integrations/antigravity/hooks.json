@@ -1,0 +1,10 @@
+{
+  "tmux-agent-signal": {
+    "PreInvocation": [
+      { "type": "command", "command": "AGENT_KIND=agy \"$(tmux show -gv @agent_signal_command)\" set working >/dev/null 2>&1 || true; printf '{}\\n'" }
+    ],
+    "Stop": [
+      { "type": "command", "command": "AGENT_KIND=agy \"$(tmux show -gv @agent_signal_command)\" set done >/dev/null 2>&1 || true; printf '{}\\n'" }
+    ]
+  }
+}

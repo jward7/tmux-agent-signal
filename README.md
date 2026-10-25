@@ -158,8 +158,8 @@ say), both report and the child overwrites the parent. Set
 `AGENT_SIGNAL_DISABLE=1` on the nested command and its hooks exit quietly
 without touching the pane.
 
-Ready-made mappings for Codex CLI, Gemini CLI, Copilot CLI, OpenCode and
-Pi are in [`integrations/`](integrations/), each a one-file drop with its
+Ready-made mappings for Codex CLI, Gemini CLI, Copilot CLI, OpenCode, Pi,
+Grok CLI and Antigravity CLI are in [`integrations/`](integrations/), each a one-file drop with its
 event table. They were written from the vendors' documentation and are not
 exercised here, so reports and fixes from people who run those agents are
 welcome.
