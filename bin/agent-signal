@@ -51,6 +51,10 @@ fi
 t() { "$TMUX_BIN" "$@"; }
 
 case ${1:-} in install-claude-hooks|help|-h|--help|version|--version) ;; *) [ -n "${TMUX:-}" ] || exit 0 ;; esac
+# An agent launched from inside another agent's pane would report over its
+# parent, and its SessionStart would relabel the pane from Claude's registry.
+# AGENT_SIGNAL_DISABLE=1 on the nested command silences every report.
+case ${1:-} in hook|set|clear|sync) case ${AGENT_SIGNAL_DISABLE:-} in ""|0|off|false) ;; *) exit 0 ;; esac ;; esac
 
 # --- options ---------------------------------------------------------------
 opt() { # opt <name> <default>
@@ -350,9 +354,6 @@ bootstrap_if_needed() {
 }
 
 set_state() { # set_state <state> [pane]
-  # An agent launched from inside another agent's pane would report over its
-  # parent. AGENT_SIGNAL_DISABLE=1 on the nested command keeps it quiet.
-  [ -z "${AGENT_SIGNAL_DISABLE:-}" ] || return 0
   bootstrap_if_needed
   pane=$(resolve_pane "${2:-}"); EVENT_PANE=$pane
   win=$(window_of "$pane") || exit 0

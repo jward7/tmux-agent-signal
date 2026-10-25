@@ -31,6 +31,13 @@ printf '{}' | AGENT_SIGNAL_DISABLE=1 TMUX_PANE=$P_API "$AS" hook PermissionReque
 is "AGENT_SIGNAL_DISABLE silences a nested agent's hooks" "$(wst "$W_API")" working
 printf '{}' | AGENT_SIGNAL_DISABLE=1 TMUX_PANE=$P_API "$AS" set blocked; rc=$?
 is "AGENT_SIGNAL_DISABLE exits 0 so the agent never notices" "$rc" 0
+T set-option -p -t "$P_API" @agent_name parent
+printf '{"source":"startup"}' | AGENT_SIGNAL_DISABLE=1 TMUX_PANE=$P_API "$AS" hook SessionStart
+is "AGENT_SIGNAL_DISABLE also skips the registry sync on SessionStart" "$(T display -p -t "$P_API" '#{@agent_pane_state} #{@agent_name}')" "working parent"
+T set-option -up -t "$P_API" @agent_name
+printf '{}' | AGENT_SIGNAL_DISABLE=0 TMUX_PANE=$P_API "$AS" hook PermissionRequest
+is "AGENT_SIGNAL_DISABLE=0 does not disable" "$(wst "$W_API")" blocked
+hook "$P_API" PreToolUse '{"tool_name":"Bash"}'
 printf '{}' | CLAUDE_JOB_DIR=/tmp/job TMUX_PANE=$P_API "$AS" hook Stop
 is "a Claude background job's hooks never touch the pane" "$(wst "$W_API")" working
 hook "$P_API" PermissionRequest
