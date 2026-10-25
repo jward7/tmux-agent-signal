@@ -339,6 +339,17 @@ EOF2
     esac
   fi
   refresh_needs
+  redraw_borders "$win"
+}
+
+# Border styles read @agent_pane_state at draw time, but setting a user option
+# does not make tmux redraw, so a split window's borders would keep their old
+# colour until the next layout change. Redraw the clients showing the window.
+redraw_borders() { # redraw_borders <window>
+  [ "$(t display -p -t "$1" '#{window_panes}')" -gt 1 ] || return 0
+  t list-clients -F '#{client_name}	#{client_session}' | while IFS='	' read -r c s; do
+    t list-windows -t "$s" -F '#{window_id}' | grep -qx "$1" && t refresh-client -t "$c"
+  done
 }
 
 refresh_needs() { # count of windows needing you (blocked or ask), for titles and your own status line
