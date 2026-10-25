@@ -16,13 +16,14 @@ D -f /dev/null new-session -d -s work -n api -x 200 -y 12 -c /tmp
 D set -g base-index 1; D move-window -r
 for w in web docs infra data; do D new-window -d -n "$w" -c /tmp; done
 
-# A plain status bar so the badges are the only colour that carries meaning.
-D set -g status-style 'bg=#666666,fg=#aaaaaa'
-D set -g window-status-style 'fg=#001a4d,bg=default'
-D set -g window-status-current-style 'fg=white,bold,bg=red'
+# A quiet status bar so the badges are the only colour that carries meaning:
+# near-black band, mid-grey tabs, the current tab in bright bold white.
+D set -g status-style 'bg=#1c1c1c,fg=#808080'
+D set -g window-status-style 'fg=#808080,bg=default'
+D set -g window-status-current-style 'fg=#e0e0e0,bold,bg=default'
 D set -g status-justify centre
 D set -g status-right-length 90
-D set -g status-right "#{?client_prefix,#[reverse]<Prefix>#[noreverse], } #[fg=green]✓ CI main#[default]  [86%%] ⚡  Mon, Sep 07 - 10:42 "
+D set -g status-right "#{?client_prefix,#[reverse]<Prefix>#[noreverse], } #[fg=green]✓ CI main  [86%%] ↯#[default]  Mon, Sep 07 - 10:42 am "
 D set -g status-left "[work] "
 D set -g @agent_signal_sound off
 
