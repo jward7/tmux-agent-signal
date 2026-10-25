@@ -9,6 +9,7 @@
 #   pane   @agent_kind    claude | codex | pi | ...   (who reported)
 #   pane   @agent_name    display name (from Claude's session registry)
 #   window @agent_state   aggregate of its panes: blocked > ask > done > working
+#   window @agent_since   epoch seconds when @agent_state last changed (next serves the oldest first)
 #   global @agent_summary  one coloured glyph per agent pane, for status-right
 #   global @agent_needs    count of windows needing you (blocked or ask), for titles
 #   window @agent_hold    wait | park                (user triage override)
@@ -295,6 +296,10 @@ EOF2
   fi
 
   if [ -n "$agg" ]; then t set-option -w -t "$win" @agent_state "$agg"; else t set-option -uw -t "$win" @agent_state; fi
+  # When the state changes, stamp it, so `next` can serve the longest wait first.
+  if [ "$agg" != "$prev" ]; then
+    if [ -n "$agg" ]; then t set-option -w -t "$win" @agent_since "$(date +%s)"; else t set-option -uw -t "$win" @agent_since; fi
+  fi
 
   if [ -n "$hold" ] && ! needs_you "$agg"; then paint_window "$win" "$hold"; else paint_window "$win" "$agg"; fi
 
@@ -436,13 +441,16 @@ seen() { # seen [window]: the hook passes its own window so a second attached cl
 next() {
   cur=$(current_window)
   # Tab separated, session *id* rather than name: names may contain spaces.
-  list=$(t list-windows -a -F '#{window_id}	#{session_id}	#{?@agent_state,#{@agent_state},-}	#{?@agent_hold,#{@agent_hold},-}')
+  list=$(t list-windows -a -F '#{window_id}	#{session_id}	#{?@agent_state,#{@agent_state},-}	#{?@agent_hold,#{@agent_hold},-}	#{?@agent_since,#{@agent_since},0}')
   # rotate so we scan the windows after the current one first
   after=$(printf '%s\n' "$list" | sed -n "/^$cur	/,\$p" | sed '1d')
   before=$(printf '%s\n' "$list" | sed "/^$cur	/,\$d")
   ordered=$(printf '%s\n%s\n' "$after" "$before")
   for want in blocked ask done; do
-    target=$(printf '%s\n' "$ordered" | awk -F'	' -v w="$want" '$3==w && $4=="-" {print $1"\t"$2; exit}')
+    # Within a tier the window that has been waiting longest comes first; the
+    # rotation order breaks ties, so repeated presses still walk the list.
+    target=$(printf '%s\n' "$ordered" | awk -F'	' -v w="$want" '$3==w && $4=="-" {print $5"\t"NR"\t"$1"\t"$2}' \
+      | sort -n -k1,1 -k2,2 | head -1 | cut -f3,4)
     if [ -n "$target" ]; then
       t switch-client -t "${target#*	}" 2>/dev/null
       t select-window -t "${target%%	*}"
@@ -556,7 +564,7 @@ uninstall() {
   done
   for w in $(t list-windows -a -F '#{window_id}'); do
     restore_tab "$w"
-    t set-option -uw -t "$w" @agent_state \; set-option -uw -t "$w" @agent_hold \; set-option -uw -t "$w" @agent_icon \; set-option -uw -t "$w" @agent_fg
+    t set-option -uw -t "$w" @agent_state \; set-option -uw -t "$w" @agent_since \; set-option -uw -t "$w" @agent_hold \; set-option -uw -t "$w" @agent_icon \; set-option -uw -t "$w" @agent_fg
   done
   for p in $(t list-panes -a -F '#{pane_id}'); do
     t set-option -up -t "$p" @agent_pane_state \; set-option -up -t "$p" @agent_kind \; set-option -up -t "$p" @agent_name

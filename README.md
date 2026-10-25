@@ -54,7 +54,7 @@ count even when another app is in front.
 
 | Key | Action |
 |-----|--------|
-| `N` | go to the next blocked window, else ask, else done |
+| `N` | go to the next blocked window, else ask, else done; within a tier, the one that has waited longest |
 | `A` | switcher popup: sessions > windows > panes with state (needs fzf) |
 | `W` | toggle **wait** on the current window |
 | `P` | toggle **park** on the current window |
@@ -175,7 +175,7 @@ client unless one is given.
 | `set working\|blocked\|ask\|done\|idle [pane]` | report a state for any agent |
 | `clear [pane]` | the agent exited; drop its state, kind and name |
 | `seen [window]` | mark a done window as viewed (the hooks call this) |
-| `next` | switch to the next blocked window, else ask, else done, skipping wait and park |
+| `next` | switch to the next blocked window, else ask, else done, oldest wait first, skipping wait and park |
 | `hold wait\|park\|clear [window]` | toggle a triage hold |
 | `list` | the session > window > pane tree the switcher shows |
 | `sync` | pull names and presence from Claude's session registry |

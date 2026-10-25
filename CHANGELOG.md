@@ -2,6 +2,9 @@
 
 ## Unreleased
 
+- `next` serves the window that has waited longest within a tier (blocked,
+  then ask, then done) instead of the next one by index. Each window records
+  when its state last changed in `@agent_since`.
 - Integrations for Grok CLI and Antigravity CLI (`agy`), from workmux's
   shipped hooks.
 - Integrations refreshed against workmux's, which its users run: Gemini's
