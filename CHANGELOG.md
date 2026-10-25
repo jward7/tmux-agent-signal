@@ -2,6 +2,10 @@
 
 ## Unreleased
 
+- A report with no pane given and no `TMUX_PANE` in the environment is
+  attributed by process ancestry (the pane whose shell is an ancestor of the
+  hook) rather than to the client's active pane, which was the wrong window
+  whenever you were looking elsewhere.
 - Hooks fired by a Claude background job (`CLAUDE_JOB_DIR` set) are ignored,
   so a job finishing in the background no longer marks the interactive pane
   done or working.

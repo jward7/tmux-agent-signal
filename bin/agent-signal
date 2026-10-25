@@ -77,8 +77,25 @@ json_array_nonempty() { # json_array_nonempty <jq-path> <key>: 0 if the array ha
 
 resolve_pane() { # resolve_pane [pane] -> echoes pane id
   p=${1:-${TMUX_PANE:-}}
+  [ -n "$p" ] || p=$(pane_by_ancestry)
   [ -n "$p" ] || p=$(t display -p '#{pane_id}')
   printf '%s' "$p"
+}
+
+# Claude occasionally runs a hook without TMUX_PANE. The client's active pane
+# is the wrong answer whenever you are looking at another window, so walk this
+# process's parents until one of them is a pane's shell.
+pane_by_ancestry() {
+  panes=$(t list-panes -a -F '#{pane_pid} #{pane_id}')
+  pid=$$; i=0
+  while [ "$pid" -gt 1 ] && [ $i -lt 40 ]; do
+    hit=$(printf '%s\n' "$panes" | awk -v p="$pid" '$1 == p { print $2; exit }')
+    [ -n "$hit" ] && { printf '%s' "$hit"; return 0; }
+    pid=$(ps -o ppid= -p "$pid" 2>/dev/null | tr -d ' ')
+    [ -n "$pid" ] || return 1
+    i=$((i + 1))
+  done
+  return 1
 }
 
 window_of() { t display -p -t "$1" '#{window_id}'; }
