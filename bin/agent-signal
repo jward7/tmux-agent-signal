@@ -15,6 +15,7 @@
 #   window @agent_hold    wait | park                (user triage override)
 #   window @agent_icon / @agent_fg                   what the status bar draws
 #   window @agent_tab_owned  1 when window-status-style was set by us
+#   window @agent_tab_saved  the style that was there before we took the tab over
 #
 # Usage:
 #   agent-signal hook <ClaudeHookEvent>        Claude Code hook entry (JSON on stdin)
@@ -50,7 +51,7 @@ else
 fi
 t() { "$TMUX_BIN" "$@"; }
 
-case ${1:-} in install-claude-hooks|help|-h|--help|version|--version) ;; *) [ -n "${TMUX:-}" ] || exit 0 ;; esac
+case ${1:-} in install-claude-hooks|check|help|-h|--help|version|--version) ;; *) [ -n "${TMUX:-}" ] || exit 0 ;; esac
 # An agent launched from inside another agent's pane would report over its
 # parent, and its SessionStart would relabel the pane from Claude's registry.
 # AGENT_SIGNAL_DISABLE=1 on the nested command silences every report.
@@ -60,6 +61,11 @@ case ${1:-} in hook|set|clear|sync) case ${AGENT_SIGNAL_DISABLE:-} in ""|0|off|f
 opt() { # opt <name> <default>
   v=$(t show-option -gqv "$1" 2>/dev/null)
   [ -n "$v" ] && printf '%s' "$v" || printf '%s' "$2"
+}
+# Like opt, but an option deliberately set to "" stays "" (a key binding or an
+# alert-states list can be switched off that way).
+opt_set() { # opt_set <name> <default>
+  if [ -n "$(t show-options -gq "$1" 2>/dev/null)" ]; then t show-option -gqv "$1" 2>/dev/null; else printf '%s' "$2"; fi
 }
 
 # --- helpers ---------------------------------------------------------------
@@ -158,7 +164,7 @@ notify() { # notify <state> <window>
 alert_command() { # alert_command <state> <prev> <window> <pane>
   cmd=$(opt @agent_signal_alert_command "")
   [ -n "$cmd" ] || return 0
-  case " $(opt @agent_signal_alert_states "blocked ask done") " in *" $1 "*) ;; *) return 0 ;; esac
+  case " $(opt_set @agent_signal_alert_states "blocked ask done") " in *" $1 "*) ;; *) return 0 ;; esac
   # display-message runs strftime over its output, so protect literal % signs.
   expanded=$(t display -p -t "$3" "$(printf '%s' "$cmd" | sed 's/%/%%/g')")
   (AGENT_SIGNAL_STATE=$1 AGENT_SIGNAL_PREV=$2 AGENT_SIGNAL_WINDOW=$3 AGENT_SIGNAL_PANE=$4 \
@@ -196,8 +202,9 @@ needs_you() { case $1 in blocked|ask) return 0 ;; *) return 1 ;; esac; }
 # current value is ours.
 restore_tab() { # restore_tab <window>
   if [ "$(t show-option -wqv -t "$1" @agent_tab_owned)" = 1 ]; then
-    t set-option -uw -t "$1" window-status-style
-    t set-option -uw -t "$1" @agent_tab_owned
+    saved=$(t show-option -wqv -t "$1" @agent_tab_saved)
+    if [ -n "$saved" ]; then t set-option -w -t "$1" window-status-style "$saved"; else t set-option -uw -t "$1" window-status-style; fi
+    t set-option -uw -t "$1" @agent_tab_owned \; set-option -uw -t "$1" @agent_tab_saved
   fi
 }
 
@@ -224,6 +231,11 @@ paint_window() { # paint_window <window> <state-or-hold>
     t set-option -w -t "$1" @agent_icon "$icon" \; set-option -w -t "$1" @agent_fg "$fg"
     restore_tab "$1"
   else
+    # Taking the tab over: remember the style that was there so it comes back.
+    if [ "$(t show-option -wqv -t "$1" @agent_tab_owned)" != 1 ]; then
+      cur=$(t show-option -wqv -t "$1" window-status-style)
+      if [ -n "$cur" ]; then t set-option -w -t "$1" @agent_tab_saved "$cur"; else t set-option -uw -t "$1" @agent_tab_saved; fi
+    fi
     t set-option -w -t "$1" @agent_icon "$icon" \; set-option -w -t "$1" @agent_fg "$fg" \
       \; set-option -w -t "$1" window-status-style "fg=$fg,bg=$bg,bold" \; set-option -w -t "$1" @agent_tab_owned 1
   fi
@@ -276,9 +288,12 @@ refresh_window() { # refresh_window <window> [event]
   win=$1; ev=${2:-}
   mend_window_format "$win"
   # One round trip for the window's previous state and hold.
+  # "-" placeholders: an empty first field would be dropped by read (a tab is
+  # IFS whitespace) and the hold would land in prev.
   IFS='	' read -r prev hold <<EOF2
-$(t display -p -t "$win" '#{@agent_state}	#{@agent_hold}')
+$(t display -p -t "$win" '#{?@agent_state,#{@agent_state},-}	#{?@agent_hold,#{@agent_hold},-}')
 EOF2
+  [ "$prev" = - ] && prev=""; [ "$hold" = - ] && hold=""
   agg=""
   # One round trip for every pane's state.
   for st in $(t list-panes -t "$win" -F '#{?@agent_pane_state,#{@agent_pane_state},-}'); do
@@ -335,7 +350,7 @@ refresh_summary() { # one glyph per agent pane, coloured by state; count of wind
     | awk -F'	' -v cw="$c_working" -v cb="$c_blocked" -v ca="$c_ask" -v cd="$c_done" -v ci="$c_idle" \
           -v gc="$g_claude" -v gx="$g_codex" -v gp="$g_pi" -v go="$g_other" '
       $2 == "-" || $5 == "1" { next }
-      { c = ci; if ($3 == "working") c = cw; else if ($3 == "blocked") c = cb; else if ($3 == "ask") c = ca; else if ($3 == done) c = cd
+      { c = ci; if ($3 == "working") c = cw; else if ($3 == "blocked") c = cb; else if ($3 == "ask") c = ca; else if ($3 == "done") c = cd
         g = go; if ($2 == "claude") g = gc; else if ($2 == "codex") g = gx; else if ($2 == "pi") g = gp
         # "<glyph><window index>" so the summary doubles as a jump list: prefix + <index>
         glyphs = glyphs (glyphs == "" ? "" : " ") "#[fg=" c "]" g $4
@@ -534,8 +549,9 @@ check() {
   case $(t show-option -gv status-right) in *@agent_summary*) say ok "summary in status-right" ;; *) say warn "summary not in status-right" ;; esac
   n=$(t show-hooks -g | grep -c "agent-signal"); if [ "$n" -ge 5 ]; then say ok "$n hooks installed"; else say fail "only $n of 5 hooks installed"; fi
   for k in next switcher wait park; do
-    key=$(opt "@agent_signal_key_$k" "")
-    [ -z "$key" ] && { case $k in next) key=N ;; switcher) key=A ;; wait) key=W ;; park) key=P ;; esac; }
+    case $k in next) d=N ;; switcher) d=A ;; wait) d=W ;; park) d=P ;; esac
+    key=$(opt_set "@agent_signal_key_$k" "$d")
+    [ -z "$key" ] && { say ok "$k binding switched off"; continue; }
     if t list-keys -T prefix | awk -v k="$key" '$4 == k' | grep -qE 'agent-signal|switcher'; then say ok "prefix+$key -> $k"; else say warn "prefix+$key is not ours ($k unbound)"; fi
   done
   themed=$(t list-windows -a -F '#{window_id}	#{?window-status-format,#{window-status-format},-}' | awk -F'	' '$2 != "-" && $2 !~ /@agent_icon/ {print $1}' | tr '\n' ' ')
@@ -561,12 +577,12 @@ uninstall() {
   for h in after-select-window client-session-changed client-attached client-focus-in pane-exited after-kill-pane window-unlinked; do
     t set-hook -gu "${h}[91]" 2>/dev/null
   done
-  for k in "$(opt @agent_signal_key_next N)" "$(opt @agent_signal_key_switcher A)" "$(opt @agent_signal_key_wait W)" "$(opt @agent_signal_key_park P)"; do
+  for k in "$(opt_set @agent_signal_key_next N)" "$(opt_set @agent_signal_key_switcher A)" "$(opt_set @agent_signal_key_wait W)" "$(opt_set @agent_signal_key_park P)"; do
     [ -n "$k" ] && t list-keys -T prefix | awk -v k="$k" '$4 == k' | grep -q agent-signal && t unbind-key -T prefix "$k"
   done
   for w in $(t list-windows -a -F '#{window_id}'); do
     restore_tab "$w"
-    t set-option -uw -t "$w" @agent_state \; set-option -uw -t "$w" @agent_since \; set-option -uw -t "$w" @agent_hold \; set-option -uw -t "$w" @agent_icon \; set-option -uw -t "$w" @agent_fg
+    t set-option -uw -t "$w" @agent_state \; set-option -uw -t "$w" @agent_since \; set-option -uw -t "$w" @agent_hold \; set-option -uw -t "$w" @agent_icon \; set-option -uw -t "$w" @agent_fg \; set-option -uw -t "$w" @agent_tab_saved
   done
   for p in $(t list-panes -a -F '#{pane_id}'); do
     t set-option -up -t "$p" @agent_pane_state \; set-option -up -t "$p" @agent_kind \; set-option -up -t "$p" @agent_name

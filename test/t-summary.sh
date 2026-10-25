@@ -13,6 +13,11 @@ esac
 is "summary shows glyph+window index"     "$got" shown
 is "summary entries are space separated"  "$(gsum | tr -cd ' ' | wc -c | tr -d ' ')" 2
 is "summary leaves no temp files"         "$(leftovers 'agent-signal.[0-9]*')" 0
+raw() { T show-option -gqv @agent_summary; }
+case $(raw) in *"#[fg=green]✳"*) got=green ;; *) got=$(raw) ;; esac
+is "done pane is coloured green in the raw summary" "$got" green
+case $(raw) in *"#[fg=yellow]✳"*) got=yellow ;; *) got=$(raw) ;; esac
+is "working pane is coloured yellow"      "$got" yellow
 
 ascii on; hook "$P_API" Stop
 is "ascii preset uses + for done"    "$(wicon "$W_API")" "+"

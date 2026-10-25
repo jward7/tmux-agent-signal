@@ -1,5 +1,23 @@
 # Changelog
 
+## Unreleased
+
+Bugs found by a test-coverage audit, each now pinned by a test.
+
+- A hold on a window with no state was misread as the state (a tab-separated
+  read dropped the empty first field): `park` on an idle window showed no
+  badge, and a parked window that started working showed `~` instead of `p`.
+- Done panes in the status-right summary were coloured idle, not green (an
+  unquoted awk comparison).
+- Setting a `@agent_signal_key_*` option to `""` now really leaves that key
+  unbound, as documented, and `@agent_signal_alert_states ""` means none.
+  `check` reports a switched-off binding.
+- A window's own `window-status-style` is restored, not removed, when the
+  plugin gives the tab back. It is kept in `@agent_tab_saved` while the tab
+  is coloured.
+- `check` run outside tmux reports "TMUX is not set" and exits 1 instead of
+  exiting 0 silently.
+
 ## 0.4.1 (2026-10-25)
 
 Fixes from a review of 0.4.0.

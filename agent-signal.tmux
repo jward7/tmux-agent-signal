@@ -16,6 +16,8 @@ if command -v tmux >/dev/null 2>&1; then TMUX_BIN=tmux; else
 fi
 t() { "$TMUX_BIN" "$@"; }
 opt() { v=$(t show-option -gqv "$1"); [ -n "$v" ] && printf '%s' "$v" || printf '%s' "$2"; }
+# An option set to "" stays "" (that is how a key binding is switched off).
+opt_set() { if [ -n "$(t show-options -gq "$1")" ]; then t show-option -gqv "$1"; else printf '%s' "$2"; fi; }
 
 # --- publish where we live ----------------------------------------------------
 # Anything that wants to report a state (another agent's hook file, a shell
@@ -44,7 +46,7 @@ fi
 # Never clobber a binding the user already has: skip it and say so once.
 # (list-keys is filtered with awk: passing the key as an argument prints nothing on some versions.)
 bind() {
-  k=$(opt "$1" "$2"); [ -n "$k" ] || return 0
+  k=$(opt_set "$1" "$2"); [ -n "$k" ] || return 0
   existing=$(t list-keys -T prefix | awk -v k="$k" '$4 == k')
   case $existing in
     "") t bind-key "$k" "$3" ;;

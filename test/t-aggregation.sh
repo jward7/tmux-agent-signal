@@ -14,7 +14,11 @@ is "a user's per-window style survives a working state" "$(wstyle "$W_WEB")" "fg
 hook "$P_WEB" PermissionRequest
 is "blocked overrides it while flagged"  "$(wstyle "$W_WEB")" "fg=black,bg=colour208,bold"
 hook "$P_WEB" SessionEnd
-is "clearing removes only our style"    "$(wstyle "$W_WEB")" ""
+is "clearing restores the user's style"  "$(wstyle "$W_WEB")" "fg=cyan,bg=blue"
+is "and forgets the saved copy"          "$(T show-option -wqv -t "$W_WEB" @agent_tab_saved)" ""
+T set-option -uw -t "$W_WEB" window-status-style
+hook "$P_WEB" PermissionRequest; hook "$P_WEB" SessionEnd
+is "a window that had no style ends with none" "$(wstyle "$W_WEB")" ""
 T set-option -uw -t "$W_WEB" window-status-style
 
 # --- multi-pane aggregation ---
