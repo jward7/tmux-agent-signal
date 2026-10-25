@@ -62,7 +62,7 @@ show 4 "infra/tf  ·  codex" "" "  ? Apply this plan to production, or staging f
   sleep 2.5; D detach-client -s work
   sleep 0.5; D kill-server
 ) &
-TMUX='' asciinema rec --overwrite --window-size 150x12 -c "tmux -L demo attach -t work" "$OUT.cast"
+TMUX='' asciinema rec --overwrite --window-size 150x7 -c "tmux -L demo attach -t work" "$OUT.cast"
 wait
 # Drop the "[detached]" tail so the GIF ends on the status bar.
 awk '/\[detached/ {exit} {print}' "$OUT.cast" > "$OUT.cast.tmp" && mv "$OUT.cast.tmp" "$OUT.cast"
