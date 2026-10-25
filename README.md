@@ -330,7 +330,10 @@ tmux, turn on `@agent_signal_bell` and let your terminal handle the bell, or
 ## How it compares
 
 All of these are good projects under active development, so this is a
-snapshot as of **2026-09-07**. tmux-agent-state is the closest relative:
+snapshot as of **2026-09-07**, agent rows re-checked **2026-10-25**.
+[workmux](https://github.com/raine/workmux) is left out because it is a
+worktree manager with a status layer, not a status plugin, but several of
+this plugin's integrations were corrected against its. tmux-agent-state is the closest relative:
 the same hook-driven, no-daemon design, with more agent integrations and
 without the triage, switcher and summary layers. 🟢 has it, 🟡 partial or optional, 🔴 does not,
 ▫️ not applicable. Corrections welcome.
@@ -353,7 +356,9 @@ without the triage, switcher and summary layers. 🟢 has it, 🟡 partial or op
 | Background task awareness | 🟢 | 🔴 | 🟢 | 🔴 | 🔴 | ▫️ |
 | Claude Code | 🟢 plugin or hooks | 🟢 plugin install | 🟢 | 🟢 | 🟢 | 🟢 |
 | Codex CLI | 🟢 hooks, from docs | 🟡 done only | 🟢 | 🟢 | 🟡 presence only | 🟢 |
-| Pi / OpenCode | 🟡 from docs / 🟡 from docs | 🟢 / 🟢 | 🔴 / 🔴 | 🟢 / 🟢 | 🔴 | 🟢 |
+| Pi / OpenCode | 🟡 from docs / 🟡 from docs | 🟡 no confirmation prompts / 🟢 | 🔴 / 🔴 | 🟢 / 🟢 | 🔴 / 🟡 presence only | 🟢 |
+| Gemini CLI / Copilot CLI | 🟡 from docs / 🟡 from docs | 🟢 / 🟢 | 🔴 / 🟡 custom status file | 🔴 | 🔴 | 🔴 |
+| Grok CLI / Antigravity CLI | 🟡 from workmux's hooks / 🟡 from workmux's hooks | 🔴 | 🔴 | 🔴 | 🔴 | 🟢 / 🔴 |
 | Agent-to-agent API | 🔴 | 🔴 | 🔴 | 🔴 | 🔴 | 🟢 socket API |
 | Survives lid close / restart without resume | 🔴 use resurrect | 🔴 | 🔴 | 🔴 | 🔴 | 🟢 |
 | Tests in repo | 🟢 | 🟢 | 🟢 | 🟢 | 🔴 | 🟢 |
