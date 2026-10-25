@@ -414,7 +414,7 @@ sh test/run.sh              # every test/t-*.sh, each on its own isolated tmux s
 sh test/run.sh -j 1         # serial
 sh test/run.sh hooks next   # just those features
 sh test/t-hooks.sh          # one file on its own; KEEP=1 leaves its server up to poke at
-shellcheck -s sh bin/agent-signal scripts/switcher.sh agent-signal.tmux docs/demo.sh test/run.sh test/lib.sh test/t-*.sh
+sh scripts/lint.sh          # shellcheck, checkbashisms and a function-size check, as CI runs them
 sh docs/demo.sh             # throwaway server showing every state; tmux -L demo attach
 ```
 
