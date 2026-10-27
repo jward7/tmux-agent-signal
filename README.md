@@ -72,7 +72,16 @@ that pane. Nothing else on the bar is the plugin's.
 
 A window with several agent panes shows the most urgent one
 (blocked > ask > done > working). Sounds play for blocked, ask and done, only
-when the window is not on screen. With `@agent_signal_title on`, the outer
+when the window is not on screen.
+
+**Terminal progress bar.** On iTerm2 3.6+, WezTerm and Ghostty the thin
+bar along the top of the terminal tab follows the window on screen: moving
+green while its agents work, filling as each one finishes (one of four done
+is a quarter), red when one is blocked, yellow when one asks. Other terminals
+are left alone: the plugin only writes it to a terminal that names itself to
+tmux as one of those. Set `"terminalProgressBarEnabled": false` in
+`~/.claude/settings.json` so Claude's own bar does not fight it (`check`
+warns). With `@agent_signal_title on`, the outer
 terminal's title carries the count too: `[2 need you] session:window`.
 
 <details>

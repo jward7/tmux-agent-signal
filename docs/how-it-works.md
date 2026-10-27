@@ -15,6 +15,16 @@ Claude runs hooks concurrently, so each update takes a lock keyed on the
 server socket and window id (a `mkdir` in `$TMPDIR`, reclaimed if a holder
 was killed) before reading and rewriting the window's state.
 
+**Progress bar.** After every refresh and every `seen`, `refresh_progress`
+lists the clients and, for each whose `#{client_termtype}` matches
+`@agent_signal_progress_terminals`, writes `ESC ] 9 ; 4 ; state ; percent BEL`
+straight to its tty, so `allow-passthrough` is not involved. The value comes
+from the agent panes of the window that client shows: blocked `2;100`
+(error), ask `4;100` (warning), all working `3;0` (indeterminate), some
+finished `1;<finished share>`, done and unseen `1;100`, otherwise `0;0`
+(hidden). The allowlist exists because OSC 9 is a desktop notification in
+older iTerm2 and in other terminals, and unknown sequences may be printed.
+
 `@agent_since` records when a window's aggregate state last changed, and
 `next` uses it to serve the longest wait first within a tier.
 

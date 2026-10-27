@@ -19,6 +19,12 @@ set -g @agent_signal_tab_colour all       # all: colour the tab for every state 
 set -g @agent_signal_title off            # on = set-titles with the needs-you count
 set -g @agent_signal_title_format '#{?@agent_needs,[#{@agent_needs} need you] ,}#S:#W'
 
+# Terminal progress bar (OSC 9;4), the bar along the top of the terminal tab
+set -g @agent_signal_progress window      # window: the window on screen; server: every window; off
+# Terminals that get it, as an extended regex on #{client_termtype} (tmux 3.3+).
+# Anything else, including a terminal that does not say what it is, gets nothing.
+set -g @agent_signal_progress_terminals '^(iTerm2 (3\.([6-9]|[1-9][0-9])|[4-9])|WezTerm|ghostty)'
+
 set -g @agent_signal_confirm_close on     # off = switcher closes without asking
 
 # Sounds (macOS system sound names, or a file path; "off" to silence one)

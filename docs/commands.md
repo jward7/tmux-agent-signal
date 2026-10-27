@@ -14,6 +14,7 @@ ancestor of the caller, else the current client's window, unless one is given.
 | `list` | the session > window > pane tree the switcher shows |
 | `sync` | pull names and presence from Claude's session registry |
 | `needs` | recompute the needs-you count (`@agent_needs`) |
+| `progress [print\|clear]` | redraw the terminal progress bar; `print` lists `tty<TAB>value` instead of writing, `clear` hides it |
 | `check` | report what is wired on this server and what is missing; exit 1 if broken |
 | `install-claude-hooks` | merge the hooks into `~/.claude/settings.json` (needs jq) |
 | `uninstall` | reverse everything the entry file set on the server |

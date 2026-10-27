@@ -2,6 +2,15 @@
 
 ## Unreleased
 
+- **Terminal progress bar.** On iTerm2 3.6+, WezTerm and Ghostty the bar at
+  the top of the terminal tab follows the window on screen: moving while its
+  agents work, filling by the share that have finished, red when one is
+  blocked, yellow when one asks. Written to the client's tty only for
+  terminals that identify themselves as one of those
+  (`@agent_signal_progress_terminals`); any other terminal gets nothing.
+  `@agent_signal_progress window|server|off`, `agent-signal progress`, and a
+  `check` warning when Claude Code's own bar is still on.
+
 - **Pane borders.** In a two-pane window, the pane whose agent is blocked,
   asking or done gets its half of the border in the tab's colour. The plugin
   appends a conditional on `@agent_pane_state` to `pane-border-style` and
