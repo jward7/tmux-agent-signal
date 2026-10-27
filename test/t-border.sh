@@ -6,20 +6,25 @@ setup
 
 border() { T display -p -t "$1" '#{E:pane-border-style}'; }
 active() { T display -p -t "$1" '#{E:pane-active-border-style}'; }
+# tmux's own defaults, as the entry file found them: "default" and "fg=green"
+# up to tmux 3.7, theme colours from 3.8, where the active one is itself a
+# format, so expand them the way the border styles are expanded.
+base=$(T display -p -t "$P_WEB" '#{E:@agent_saved_pane-border-style}')
+abase=$(T display -p -t "$P_WEB" '#{E:@agent_saved_pane-active-border-style}')
 
-is "the user's base style is kept in front"     "$(border "$P_WEB")" "default"
+is "the user's base style is kept in front"     "$(border "$P_WEB")" "$base"
 hook "$P_WEB" UserPromptSubmit
-is "working adds nothing"                        "$(border "$P_WEB")" "default"
+is "working adds nothing"                        "$(border "$P_WEB")" "$base"
 hook "$P_WEB" PermissionRequest
-is "blocked appends orange"                      "$(border "$P_WEB")" "default,fg=colour208"
-is "and the other pane in the window is untouched" "$(border "$P_WEB2")" "default"
-is "the active border style gets the same colour" "$(active "$P_WEB")" "fg=green,fg=colour208"
+is "blocked appends orange"                      "$(border "$P_WEB")" "$base,fg=colour208"
+is "and the other pane in the window is untouched" "$(border "$P_WEB2")" "$base"
+is "the active border style gets the same colour" "$(active "$P_WEB")" "$abase,fg=colour208"
 hook "$P_WEB" PreToolUse '{"tool_name":"AskUserQuestion"}'
-is "ask appends pink"                            "$(border "$P_WEB")" "default,fg=colour213"
+is "ask appends pink"                            "$(border "$P_WEB")" "$base,fg=colour213"
 hook "$P_WEB" Stop
-is "done appends green"                          "$(border "$P_WEB")" "default,fg=green"
+is "done appends green"                          "$(border "$P_WEB")" "$base,fg=green"
 "$AS" seen "$W_WEB"
-is "seen clears it"                              "$(border "$P_WEB")" "default"
+is "seen clears it"                              "$(border "$P_WEB")" "$base"
 hook "$P_WEB" SessionEnd
 
 # A theme's own style, with a comma, survives as the base.
