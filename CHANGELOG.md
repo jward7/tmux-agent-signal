@@ -2,6 +2,20 @@
 
 ## Unreleased
 
+- **Usage meter (opt-in).** `@agent_signal_limits on` records how much of the
+  Claude Code and Codex subscription allowance is used, per 5-hour and weekly
+  window, and publishes `@agent_limits` (`C 62% X 40%`) for your own
+  `status-right`: plain on pace, orange at 90% used or when over pace by
+  more than `@agent_signal_limits_pace` points, red at 100%, dim when an
+  agent has not reported for six hours. Claude's numbers come from its
+  statusLine JSON (`agent-signal statusline`, wired by
+  `install-claude-statusline`, which wraps the status line you had and which
+  `uninstall` puts back); Codex's from the tail of its newest rollout log as
+  a turn ends. No network, no credentials, no timer: the meter moves on
+  agent events. `@agent_signal_limits_show remaining|used`,
+  `agent-signal limits`, and the raw `@agent_limit_*` options. Off by
+  default, and with it off nothing is recorded or published.
+
 - **Terminal progress bar.** On iTerm2 3.6+, WezTerm and Ghostty the bar at
   the top of the terminal tab follows the window on screen: moving while its
   agents work, filling by the share that have finished, red when one is

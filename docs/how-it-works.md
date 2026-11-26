@@ -48,6 +48,64 @@ it, tracked with `@agent_tab_owned`, so a style you or a theme put on a window
 survives. Key bindings are skipped, with a message, when the key is already
 bound to something else.
 
+## Usage meter
+
+Opt-in (`@agent_signal_limits on`). The numbers come from what the agents
+already write locally. The plugin makes no network call and reads no
+credential.
+
+```
+Claude statusLine ──> agent-signal statusline ──> @agent_limit_claude_<5h|7d>_used/_reset, _at
+                                               └─> rebuild @agent_limits
+                                               └─> your previous statusLine command (same stdin)
+Codex Stop hook ──> agent-signal set done ──> tail of the newest rollout log ──> @agent_limit_codex_...
+any agent event ──> rebuild @agent_limits
+status-right: #{@agent_limits}, read natively
+```
+
+**Claude Code** pipes a JSON object to its `statusLine` command after each
+assistant message. For Pro, Max and Ultra plans it carries
+`rate_limits.five_hour` and `rate_limits.seven_day`, each with
+`used_percentage` (0 to 100) and `resets_at` (epoch seconds). The object is
+absent until the session's first API response, either window can be
+missing, and Claude drops a window once its reset passes. A payload records
+the windows it has and leaves the others as they were.
+
+**Codex** writes each session to
+`${CODEX_HOME:-~/.codex}/sessions/YYYY/MM/DD/rollout-*.jsonl`. Its
+`token_count` events carry `rate_limits.primary` and `.secondary`, each
+with `used_percent`, `window_minutes` and `resets_at`. When a Codex turn
+ends (`set done` with `AGENT_KIND=codex`) the plugin reads the last such
+record in the last 100 lines of the most recently written log. Windows are
+told apart by `window_minutes` (300 is the 5-hour one, 10080 the weekly),
+not by position, and any other length is ignored. An older Codex wrote
+`resets_in_seconds` instead, which is counted from the moment it is read.
+With neither field no reset is stored, and that window has no pace.
+
+Every session reports what it last saw, so an idle one can be behind the
+others. A record is ignored when its window resets earlier than the one
+already stored, or when it is the same window with less used: within one
+window usage only grows.
+
+**No polling.** `@agent_limits` is rebuilt when a window is recorded and on
+every agent event the plugin already handles, in one `show-options` call and
+one awk. Pace and staleness depend on the clock, so they only advance at
+those moments. With every agent idle the meter is as old as the last event,
+which is also when the allowance is not being spent.
+
+**If a network source is ever added** (the agents' undocumented usage
+endpoints would give numbers between events), it has to keep to the rules
+the existing tools in this space follow:
+
+- credentials are read-only: never refresh, rotate or write a token, and
+  show stale data instead;
+- a bearer token never goes in argv: `curl --config -` on stdin, never `-H`
+  on the command line;
+- after an HTTP 429, back off five minutes and keep the last good value,
+  marked stale;
+- an atomic cache and `flock`, so several tmux clients do not repeat the
+  request.
+
 `agent-signal sync` reads Claude Code's own session registry
 (`~/.claude/sessions/*.json`, which records each session's tmux pane and
 display name) to label panes. It runs on `SessionStart`, when the plugin

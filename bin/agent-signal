@@ -11,6 +11,8 @@
 #   window @agent_state   aggregate of its panes: blocked > ask > done > working
 #   window @agent_since   epoch seconds when @agent_state last changed (next serves the oldest first)
 #   global @agent_needs    count of windows needing you (blocked or ask), for titles
+#   global @agent_limits   usage meter for your own status line (only with @agent_signal_limits on)
+#   global @agent_limit_<claude|codex>_<5h|7d>_used / _reset and @agent_limit_<agent>_at: what it is built from
 #   (the terminal's OSC 9;4 progress bar is written to each client's tty, not stored)
 #   window @agent_hold    wait | park                (user triage override)
 #   window @agent_icon / @agent_fg                   what the status bar draws
@@ -29,7 +31,10 @@
 #   agent-signal sync                          pull names/presence from ~/.claude/sessions
 #   agent-signal needs                         recompute the needs-you count
 #   agent-signal progress [print|clear]        redraw the terminal progress bar (print: show, don't write)
+#   agent-signal limits                        recompute the usage meter (@agent_limits)
+#   agent-signal statusline [command]          Claude Code statusLine entry: record usage limits, then run command
 #   agent-signal install-claude-hooks          merge hooks into ~/.claude/settings.json (needs jq)
+#   agent-signal install-claude-statusline     point Claude's statusLine here, keeping yours (needs jq)
 #   agent-signal check                         report what is wired and what is missing (exit 1 if broken)
 #   agent-signal uninstall                     undo everything the entry file set on the server
 #   agent-signal lock-path <window>            print the lock directory used for that window (debugging)
@@ -49,11 +54,12 @@ else
   for c in /opt/homebrew/bin/tmux /usr/local/bin/tmux /usr/bin/tmux /opt/homebrew/Cellar/tmux/*/bin/tmux /usr/local/Cellar/tmux/*/bin/tmux; do
     [ -x "$c" ] && TMUX_BIN=$c && break
   done
-  [ -n "$TMUX_BIN" ] || exit 0
+  # (statusline still has the previous status line command to run.)
+  [ -n "$TMUX_BIN" ] || [ "${1:-}" = statusline ] || exit 0
 fi
 t() { "$TMUX_BIN" "$@"; }
 
-case ${1:-} in install-claude-hooks|check|help|-h|--help|version|--version) ;; *) [ -n "${TMUX:-}" ] || exit 0 ;; esac
+case ${1:-} in install-claude-hooks|install-claude-statusline|statusline|check|help|-h|--help|version|--version) ;; *) [ -n "${TMUX:-}" ] || exit 0 ;; esac
 # An agent launched from inside another agent's pane would report over its
 # parent, and its SessionStart would relabel the pane from Claude's registry.
 # AGENT_SIGNAL_DISABLE=1 on the nested command silences every report.
@@ -394,6 +400,110 @@ refresh_progress() { # refresh_progress [print|clear]: print lists "tty<TAB>valu
   return 0
 }
 
+# --- usage limits (opt-in: @agent_signal_limits on) --------------------------
+# How much of each agent's subscription allowance is used, from what the
+# agents already hand over: Claude Code's statusLine JSON and the tail of
+# Codex's newest rollout log. No network, no credentials, no timer: a window
+# is recorded when its agent reports, and @agent_limits is rebuilt on every
+# agent event, so pace and staleness only move when something happens.
+limits_on() { [ "$(opt @agent_signal_limits off)" = on ]; }
+
+limit_window() { # limit_window <agent> <json-key> [5h|7d]: record the window at "key" in $JSON
+  if command -v jq >/dev/null 2>&1; then
+    lf=$(printf '%s' "$JSON" | jq -r --arg k "$2" '[.. | .[$k]? | objects] | last // empty
+      | "\(.used_percentage // .used_percent // "-") \(.resets_at // "-") \(.window_minutes // "-") \(.resets_in_seconds // "-")"' 2>/dev/null)
+  else
+    # A window is a flat object, so its body runs to the first closing brace.
+    lo=$(printf '%s' "$JSON" | tr -d '\n' | sed -n "s/.*\"$2\"[[:space:]]*:[[:space:]]*{\([^{}]*\)}.*/\1/p")
+    lf=$(for lk in 'used_percent[a-z]*' resets_at window_minutes resets_in_seconds; do
+      ln=$(printf '%s' "$lo" | sed -n "s/.*\"$lk\"[[:space:]]*:[[:space:]]*\([0-9][0-9.]*\).*/\1/p"); printf '%s ' "${ln:--}"; done)
+  fi
+  IFS=' ' read -r used reset mins secs <<EOF2
+$lf
+EOF2
+  # Codex names its windows by position, which moves (a plan may have only a
+  # weekly or a monthly one), so the length decides which window this is.
+  lw=${3:-}; case $mins in 300) lw=5h ;; 10080) lw=7d ;; esac
+  used=${used%%.*}; reset=${reset%%.*}; secs=${secs%%.*}
+  case $used in ''|*[!0-9]*) return 0 ;; esac
+  [ -n "$lw" ] || return 0
+  case $reset in ''|*[!0-9]*) case $secs in ''|*[!0-9]*) reset="" ;; *) reset=$((NOW + secs)) ;; esac ;; esac
+  # A session reports what it last saw, so an idle one can be behind the
+  # others: an earlier window never replaces a later one, and within one
+  # window (resets within a minute of each other) usage only grows.
+  old=$(opt "@agent_limit_${1}_${lw}_reset" 0)
+  if [ -n "$reset" ] && [ "$reset" -le $((old + 60)) ]; then
+    [ "$reset" -ge $((old - 60)) ] && [ "$used" -ge "$(opt "@agent_limit_${1}_${lw}_used" 0)" ] || return 0
+  fi
+  [ "$used" -le 100 ] || used=100
+  t set-option -g "@agent_limit_${1}_${lw}_used" "$used" \; set-option -g "@agent_limit_${1}_at" "$NOW"
+  if [ -n "$reset" ]; then t set-option -g "@agent_limit_${1}_${lw}_reset" "$reset"; else t set-option -gu "@agent_limit_${1}_${lw}_reset"; fi
+}
+
+limits_codex() { # the last rate_limits record in the tail of the newest rollout log
+  ld="${CODEX_HOME:-$HOME/.codex}/sessions"; [ -d "$ld" ] || return 0
+  lf=$(find "$ld" -name 'rollout-*.jsonl' -mtime -1 -exec ls -t {} + 2>/dev/null | head -1)
+  [ -n "$lf" ] || return 0
+  JSON=$(tail -n 100 "$lf" | grep '"rate_limits"[[:space:]]*:[[:space:]]*{' | tail -1)
+  [ -n "$JSON" ] || return 0
+  limit_window codex primary; limit_window codex secondary
+}
+
+# The figure is what is left of the 5-hour window ("C 62%"), plus the weekly
+# one ("w30%") when that is tighter or the only one known. Plain while on
+# pace; orange at 90% used or when what is left trails an even burn-down of
+# the window by more than @agent_signal_limits_pace points; red at 100%. A
+# window whose reset has passed is dropped, and an agent not heard from for
+# six hours is dimmed.
+limits() { # limits [claude|codex]: record that agent's windows, then rebuild @agent_limits
+  limits_on || return 0
+  NOW=${AGENT_SIGNAL_NOW:-$(date +%s)}
+  case ${1:-} in
+    claude) limit_window claude five_hour 5h; limit_window claude seven_day 7d ;;
+    codex)  limits_codex ;;
+  esac
+  out=$(t show-options -g | awk -v now="$NOW" '
+    function window(k, len,    used, reset) { # sets lvl (0 nothing to show, 1 plain, 2 orange, 3 red), left, plain, txt
+      lvl = 0; if (!((k "_used") in v)) return
+      used = v[k "_used"] + 0; reset = v[k "_reset"]
+      if (reset != "" && reset + 0 <= now) return
+      left = 100 - used; plain = (show == "used" ? used : left) "%"
+      lvl = used >= 100 ? 3 : (used >= 90 || (pace > 0 && reset != "" && 100 * (reset - now) / len - left > pace)) ? 2 : 1
+      txt = lvl > 1 ? "#[fg=" (lvl == 3 ? "red" : "colour208") "]" plain "#[default]" : plain
+    }
+    BEGIN { pace = 10 }
+    $1 ~ /^@agent_limit_/ { v[substr($1, 14)] = $2 }
+    $1 == "@agent_signal_limits_show" { show = $2 }
+    $1 == "@agent_signal_limits_pace" { pace = $2 + 0 }
+    END {
+      n = split("claude C codex X", a, " ")
+      for (i = 1; i < n; i += 2) {
+        window(a[i] "_5h", 18000); l5 = lvl; left5 = left; s = p = ""
+        if (lvl) { s = " " txt; p = " " plain }
+        window(a[i] "_7d", 604800)
+        if (lvl && (!l5 || left < left5 || lvl > l5)) { s = s " w" txt; p = p " w" plain }
+        if (s == "") continue
+        if (now - v[a[i] "_at"] > 21600) s = "#[fg=colour245]" a[i + 1] p "#[default]"; else s = a[i + 1] s
+        out = out (out == "" ? "" : " ") s
+      }
+      print out
+    }')
+  if [ -n "$out" ]; then t set-option -g @agent_limits "$out"; else t set-option -gu @agent_limits; fi
+}
+
+# --- Claude Code statusLine entry ---------------------------------------------
+# Claude pipes its status JSON here. The usage windows in it are recorded, then
+# the command that was the status line before us (the argument the installer
+# wrote, else @agent_signal_statusline_next) gets the same stdin and decides
+# what is printed and the exit status. Without one, nothing is printed.
+statusline() { # statusline [command]
+  JSON=$(cat 2>/dev/null; printf x); JSON=${JSON%x}   # $(cat) alone would drop the trailing newline
+  [ -z "${TMUX:-}" ] || limits claude >/dev/null 2>&1
+  next=${1:-$(opt @agent_signal_statusline_next "")}
+  [ -n "$next" ] || return 0
+  printf '%s' "$JSON" | sh -c "$next"
+}
+
 # A hook can fire before tmux has sourced the entry file (plugin installed,
 # tmux not yet reloaded). Wire the server up on the spot rather than dropping
 # the event; the entry file is idempotent, so a later reload changes nothing.
@@ -419,6 +529,8 @@ set_state() { # set_state <state> [pane]
   needs_you "$1" && bell "$pane"
   refresh_window "$win" event
   unlock_window
+  # Codex has no status line to report through: its log is read as a turn ends.
+  if [ "${AGENT_KIND:-}" = codex ] && [ "$1" = done ]; then limits codex; else limits; fi
 }
 
 # --- Claude Code hook mapping ---------------------------------------------
@@ -575,6 +687,34 @@ install_claude_hooks() {
   ' "$settings" > "$tmp" && mv "$tmp" "$settings" && echo "hooks merged into $settings (backup: $settings.bak-agent-signal)"
 }
 
+# Claude has one statusLine, so ours wraps whatever was there: the old command
+# becomes the argument `statusline` chains to, and the original setting is kept
+# beside the settings file for uninstall to put back.
+install_claude_statusline() {
+  settings="$HOME/.claude/settings.json"
+  command -v jq >/dev/null 2>&1 || { echo "jq is required to edit $settings; by hand, set statusLine.command to: \"$SELF\" statusline" >&2; exit 1; }
+  [ -f "$settings" ] || { mkdir -p "$(dirname "$settings")" && printf '{}\n' > "$settings"; }
+  restore_claude_statusline >/dev/null   # a re-run starts from the original (the plugin may have moved)
+  case $(jq -r '.statusLine.command // ""' "$settings") in *agent-signal*" statusline"*)
+    echo "statusLine in $settings already runs agent-signal statusline" >&2; exit 1 ;; esac
+  jq '.statusLine // null' "$settings" > "$settings.statusline-agent-signal" || exit 1
+  tmp=$(mktemp "$settings.XXXXXX") || exit 1
+  trap 'rm -f "$tmp"' EXIT INT TERM
+  jq --arg bin "$SELF" '(.statusLine.command // null) as $prev
+    | .statusLine = ((.statusLine // {}) + {type: "command", command: ("\"" + $bin + "\" statusline" + (if $prev then " " + ($prev | @sh) else "" end))})
+  ' "$settings" > "$tmp" && mv "$tmp" "$settings" && echo "statusLine set in $settings (original kept in $settings.statusline-agent-signal)"
+}
+
+restore_claude_statusline() { # put back the statusLine the installer found
+  settings="$HOME/.claude/settings.json"; saved="$settings.statusline-agent-signal"
+  { [ -f "$saved" ] && command -v jq >/dev/null 2>&1; } || return 0
+  case $(jq -r '.statusLine.command // ""' "$settings" 2>/dev/null) in *agent-signal*" statusline"*) ;; *) return 0 ;; esac
+  tmp=$(mktemp "$settings.XXXXXX") || return 0
+  jq --slurpfile s "$saved" 'if $s[0] == null then del(.statusLine) else .statusLine = $s[0] end' "$settings" > "$tmp" \
+    && mv "$tmp" "$settings" && rm -f "$saved" && echo "agent-signal: statusLine in $settings is back as it was"
+  rm -f "$tmp"
+}
+
 # --- check -----------------------------------------------------------------
 # What is wired, what is missing, and whether anything reports. Exits 1 if
 # something the plugin relies on is not in place.
@@ -597,6 +737,7 @@ check() {
   themed=$(t list-windows -a -F '#{window_id}	#{?window-status-format,#{window-status-format},-}' | awk -F'	' '$2 != "-" && $2 !~ /@agent_icon/ {print $1}' | tr '\n' ' ')
   if [ -z "$themed" ]; then say ok "no window overrides its format without the badge"; else say warn "windows with an unmended format override: $themed (fixed on their next event)"; fi
   check_progress
+  check_limits
   agents=$(t list-panes -a -F '#{?@agent_kind,1,}' | grep -c 1); say ok "$agents pane(s) report an agent"
   if command -v jq >/dev/null 2>&1; then say ok "jq found"; else say warn "jq not found (sed fallback for hooks; installer unavailable)"; fi
   if command -v fzf >/dev/null 2>&1; then say ok "fzf found"; else say warn "fzf not found (switcher unavailable)"; fi
@@ -615,6 +756,15 @@ check_progress() { # the progress bar lines of check (uses check's say)
   if command -v jq >/dev/null 2>&1 && [ -f "$f" ] && [ "$(jq -r '.terminalProgressBarEnabled' "$f" 2>/dev/null)" != false ]; then
     say warn "Claude Code draws its own progress bar too; set \"terminalProgressBarEnabled\": false in $f"
   fi
+}
+
+check_limits() { # the usage meter lines of check (uses check's say)
+  limits_on || { say ok "usage meter switched off (@agent_signal_limits)"; return 0; }
+  say ok "usage meter on: $(opt @agent_limits "nothing recorded yet" | sed 's/#\[[^]]*\]//g')"
+  if grep -q 'agent-signal[\\"]* statusline' "$HOME/.claude/settings.json" 2>/dev/null; then say ok "Claude Code statusLine runs agent-signal statusline"
+  else say warn "Claude Code statusLine does not run agent-signal statusline (install-claude-statusline)"; fi
+  ld="${CODEX_HOME:-$HOME/.codex}/sessions"
+  if [ -d "$ld" ]; then say ok "Codex rollout logs in $ld"; else say ok "no Codex rollout logs in $ld"; fi
 }
 
 # --- uninstall -------------------------------------------------------------
@@ -655,6 +805,8 @@ uninstall() {
     t set-option -up -t "$p" @agent_pane_state \; set-option -up -t "$p" @agent_kind \; set-option -up -t "$p" @agent_name
   done
   t set-option -gu @agent_needs; t set-option -gu @agent_signal_command
+  for o in $(t show-options -g | sed -n 's/^\(@agent_limit[a-z0-9_]*\) .*/\1/p'); do t set-option -gu "$o"; done
+  restore_claude_statusline
   echo "agent-signal: removed formats, hooks, key bindings and window/pane state. Claude hooks in ~/.claude/settings.json are left for you to delete."
 }
 
@@ -666,6 +818,8 @@ case ${1:-} in
   clear)  set_state clear "${2:-}" ;;
   seen)   seen "${2:-}" ;;
   needs|summary) refresh_needs; refresh_progress ;;
+  limits) limits ;;
+  statusline) statusline "${2:-}" ;;
   progress) case ${2:-} in ""|print|clear) refresh_progress "${2:-}" ;; *) echo "agent-signal progress: print or clear" >&2; exit 1 ;; esac ;;
   badge-format) printf '%s\n' "$BADGE" ;;
   window-format) printf '%s\n' "$WINDOW_FORMAT" ;;
@@ -676,6 +830,7 @@ case ${1:-} in
   list)   list ;;
   sync)   sync_registry ;;
   install-claude-hooks) install_claude_hooks ;;
+  install-claude-statusline) install_claude_statusline ;;
   uninstall) uninstall ;;
   check)  check ;;
   help|-h|--help) usage ;;

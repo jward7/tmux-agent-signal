@@ -15,9 +15,12 @@ ancestor of the caller, else the current client's window, unless one is given.
 | `sync` | pull names and presence from Claude's session registry |
 | `needs` | recompute the needs-you count (`@agent_needs`) |
 | `progress [print\|clear]` | redraw the terminal progress bar; `print` lists `tty<TAB>value` instead of writing, `clear` hides it |
+| `limits` | recompute the usage meter (`@agent_limits`); does nothing unless `@agent_signal_limits` is `on` |
+| `statusline [command]` | Claude Code `statusLine` entry: records the usage limits in the JSON on stdin, then runs `command` (else `@agent_signal_statusline_next`) with the same stdin, printing its output and keeping its exit status. With no command it prints nothing |
 | `check` | report what is wired on this server and what is missing; exit 1 if broken |
 | `install-claude-hooks` | merge the hooks into `~/.claude/settings.json` (needs jq) |
-| `uninstall` | reverse everything the entry file set on the server |
+| `install-claude-statusline` | set `statusLine` in `~/.claude/settings.json` to `agent-signal statusline`, wrapped around the status line you had (needs jq) |
+| `uninstall` | reverse everything the entry file set on the server, and restore the `statusLine` the installer replaced |
 | `lock-path <window>` | print the lock directory for a window (debugging) |
 | `help`, `version` | |
 
@@ -41,6 +44,29 @@ handful of tmux commands: on an 18-pane server one event costs about a dozen
 tmux client calls, roughly half a second on a slow machine and much less on a
 fast one. Updates to the same window are serialised with a lock, since Claude
 runs hooks concurrently.
+
+## The usage meter and Claude's status line
+
+Claude Code has one `statusLine` command and sends it the rate-limit
+windows, so with `@agent_signal_limits on` that command has to be the
+plugin. `install-claude-statusline` rewrites only `statusLine.command`:
+
+```json
+"statusLine": { "type": "command", "command": "\"/path/to/bin/agent-signal\" statusline 'your-old-command'", "padding": 2 }
+```
+
+Your old command still draws the status line: it gets the same JSON on
+stdin, and its output and exit status pass straight through, inside tmux or
+out of it. With no old command, nothing is printed and Claude shows no
+status line. The setting as it was is kept in
+`~/.claude/settings.json.statusline-agent-signal`, and `uninstall` puts it
+back unless you have changed `statusLine` since. Running the installer again
+is safe: it starts from the kept original.
+
+Run the installer from the copy tpm manages (`~/.tmux/plugins/...`): the
+path it writes is its own, and the copy Claude Code keeps for its plugin
+moves with each plugin update. Without jq, set the command by hand as
+above. Recording itself works without jq.
 
 ## Other agents
 
@@ -82,7 +108,8 @@ welcome.
 ```
 
 removes the status-bar fragments, hooks, key bindings and any per-window or
-per-pane state from the running server. Then drop the plugin line from your
+per-pane state from the running server, and restores the `statusLine` that
+`install-claude-statusline` replaced. Then drop the plugin line from your
 tmux config and delete the `agent-signal` entries from the hooks block in
 `~/.claude/settings.json`.
 

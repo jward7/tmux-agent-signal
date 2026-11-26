@@ -10,7 +10,7 @@
 [Install](#install) · [Keys](#keys) · [Configuration](docs/configuration.md) · [Commands](docs/commands.md) · [Comparison](docs/comparison.md) · [Changelog](CHANGELOG.md)
 
 [![CI](https://github.com/jward7/tmux-agent-signal/actions/workflows/ci.yml/badge.svg)](https://github.com/jward7/tmux-agent-signal/actions/workflows/ci.yml)
-![POSIX sh](https://img.shields.io/badge/POSIX_sh-~800_lines-4cc24c)
+![POSIX sh](https://img.shields.io/badge/POSIX_sh-~1000_lines-4cc24c)
 ![tmux 3.1+](https://img.shields.io/badge/tmux-3.1%2B-1BB91F)
 ![tested on macOS and Linux](https://img.shields.io/badge/tested_on-macOS_%7C_Linux-blue)
 [![MIT](https://img.shields.io/badge/license-MIT-lightgrey)](LICENSE)
@@ -49,7 +49,12 @@ that pane. Nothing else on the bar is the plugin's.
   border the same way.
   Everything else in your status line and your border styles is yours, and
   `uninstall` puts it all back.
-- **Small and tested.** About 800 lines of POSIX `sh`, and a test suite that
+- **A usage meter, if you want one.** Off by default: `@agent_signal_limits
+  on` publishes how much of the Claude Code and Codex 5-hour and weekly
+  allowance is left as `@agent_limits`, for your own `status-right`, coloured
+  only when you are burning it faster than the window allows. Still no
+  polling and no network: see [Configuration](docs/configuration.md#usage-meter).
+- **Small and tested.** About 1000 lines of POSIX `sh`, and a test suite that
   starts a real tmux server, pipes real hook JSON through the real script and
   asserts on the options. CI runs it on macOS and Ubuntu.
 - **Any agent.** Claude Code is wired up out of the box, as a tmux plugin or a

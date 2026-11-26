@@ -106,6 +106,9 @@ setup_env() {
   trap 'cleanup; exit 129' HUP
   trap '_rc=$?; cleanup; exit $_rc' EXIT
   TMPDIR=$(mktemp -d "${TMPDIR:-/tmp}/agent-signal-test.XXXXXX") && export TMPDIR
+  # The scripts read ~/.claude and ~/.codex, and uninstall rewrites Claude's
+  # settings.json: keep every test off the real home directory.
+  HOME=$TMPDIR; export HOME
   # The scripts talk to whatever server $TMUX points at, so point it at ours.
   TMUX="$SOCK_PATH,0,0"; export TMUX
 }

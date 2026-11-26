@@ -23,6 +23,10 @@ Codex's `SessionStart` is bound to the first turn rather than to launch, so
 the pane is labelled when the first prompt goes in. Codex does not fire a
 `SessionEnd`; the state is dropped when the pane closes.
 
+With the [usage meter](../../docs/configuration.md#usage-meter) on, the
+`Stop` hook also reads the rate-limit windows from the tail of the newest
+log in `${CODEX_HOME:-$HOME/.codex}/sessions`. Nothing else to set up.
+
 If your Codex predates hooks, the older `notify` setting still gives you done:
 
 ```toml
