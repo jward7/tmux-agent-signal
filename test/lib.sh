@@ -88,7 +88,16 @@ cleanup() {
   _cleaned=1
   [ "${KEEP:-}" != 1 ] || return 0
   [ -z "${TERM_SOCK:-}" ] || { tmux -L "$TERM_SOCK" kill-server 2>/dev/null; rm -f "${SOCK_PATH}-term"; }
+  # The shells in the panes write their history file as they are hung up, and
+  # their $HOME is the directory about to be removed: let them finish first.
+  _pids=$(T list-panes -a -F '#{pane_pid}' 2>/dev/null)
   T kill-server 2>/dev/null
+  _i=0
+  while [ $_i -lt 40 ]; do
+    _alive=0; for _p in $_pids; do kill -0 "$_p" 2>/dev/null && _alive=1; done
+    [ "$_alive" = 1 ] || break
+    sleep 0.05; _i=$((_i + 1))
+  done
   # tmux leaves the socket file behind, and this name is used once ever.
   rm -f "$SOCK_PATH"
   case ${TMPDIR:-} in */agent-signal-test.*) rm -rf "$TMPDIR" ;; esac
@@ -107,10 +116,10 @@ setup_env() {
   trap '_rc=$?; cleanup; exit $_rc' EXIT
   TMPDIR=$(mktemp -d "${TMPDIR:-/tmp}/agent-signal-test.XXXXXX") && export TMPDIR
   # The scripts read ~/.claude and ~/.codex, and uninstall rewrites Claude's
-  # settings.json: keep every test off the real home directory. The tmux
-  # server is still started with the real one (see setup), so the shells in
-  # its panes do not write their history files into a directory about to go.
-  REAL_HOME=$HOME; HOME=$TMPDIR; export HOME
+  # settings.json: keep every test off the real home directory. The server
+  # started below inherits it too, so what it runs itself (the entry file's
+  # `sync`, the pane shells) stays off the real one as well.
+  HOME=$TMPDIR; export HOME
   # The scripts talk to whatever server $TMUX points at, so point it at ours.
   TMUX="$SOCK_PATH,0,0"; export TMUX
 }
@@ -121,7 +130,7 @@ setup_env() {
 setup() {
   setup_env
   T kill-server 2>/dev/null
-  env HOME="$REAL_HOME" tmux -L "$SOCK" -f /dev/null new-session -d -s main -n shell -x 120 -y 30
+  T -f /dev/null new-session -d -s main -n shell -x 120 -y 30
   T set-option -g @agent_signal_sound off          # no afplay in CI
   T set-option -g @agent_signal_tab_colour on
   sh "$ROOT/agent-signal.tmux"

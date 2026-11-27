@@ -29,6 +29,7 @@ payload() { # payload <rate_limits member, or nothing>
   printf '{"session_id":"abc","cwd":"/x","model":{"id":"claude-opus-5-5","display_name":"Opus"},"context_window":{"context_window_size":200000,"used_percentage":8,"remaining_percentage":92},"exceeds_200k_tokens":false%s,"vim":{"mode":"INSERT"}}' "${1:+,$1}"
 }
 FULL=$(payload "\"rate_limits\":{\"five_hour\":{\"used_percentage\":23.5,\"resets_at\":$R5},\"seven_day\":{\"used_percentage\":41.2,\"resets_at\":$R7}}")
+WEEKDROP=$(payload "\"rate_limits\":{\"five_hour\":{\"used_percentage\":23.5,\"resets_at\":$R5},\"seven_day\":{\"used_percentage\":10,\"resets_at\":$R7}}")   # FULL, with the weekly figure down
 WEEKLY=$(payload "\"rate_limits\":{\"seven_day\":{\"used_percentage\":36,\"resets_at\":$R7}}")
 five() { payload "\"rate_limits\":{\"five_hour\":{\"used_percentage\":$1,\"resets_at\":$2}}"; }   # five <used> <reset>
 
@@ -82,6 +83,26 @@ claude_cases() { # claude_cases <label>
   is "$1: 9m59s after the record a lower figure is still refused" "$(g @agent_limit_claude_5h_used)" 5
   sl "$(five 2 $((R5 + 18000)))" $((NOW + 600))
   is "$1: after ten minutes a lower figure is taken"  "$(g @agent_limit_claude_5h_used):$(g @agent_limit_claude_at)" "2:$((NOW + 600))"
+
+  # The two windows share one record time, read before either is written: the
+  # weekly one can still drop once ten minutes are up, with the 5-hour one in
+  # the same report.
+  wipe; sl "$FULL"; sl "$WEEKDROP" $((NOW + 700))
+  is "$1: after ten minutes the weekly figure drops, 5-hour window or not" "$(g @agent_limit_claude_7d_used)" 10
+
+  # A window that has already reset is not a record: an idle session still
+  # holding one must not put it over the live window, whenever it reports.
+  wipe; sl "$(five 5 "$R5")"; sl "$(five 95 $((NOW + 600)))" $((NOW + 700))
+  is "$1: an expired window never replaces a running one" "$(g @agent_limit_claude_5h_used):$(g @agent_limit_claude_5h_reset):$(g @agent_limits)" "5:$R5:C 95%"
+  wipe; sl "$(five 95 $((NOW - 100)))"
+  is "$1: and is not recorded on its own either"     "$(count)" 0
+
+  # The same numbers again are not written again (every write makes tmux
+  # repaint): the record time moves at most every five minutes.
+  wipe; sl "$FULL"; sl "$FULL" $((NOW + 299))
+  is "$1: the same report within five minutes leaves the record time" "$(g @agent_limit_claude_at)" "$NOW"
+  sl "$FULL" $((NOW + 300))
+  is "$1: after five minutes the record time is brought up to date" "$(g @agent_limit_claude_at)" "$((NOW + 300))"
 
   # Only the windows under rate_limits count, wherever else the names turn up.
   wipe; sl "{\"before\":{\"five_hour\":{\"used_percentage\":88,\"resets_at\":$R7}},\"rate_limits\":{\"five_hour\":{\"used_percentage\":12,\"resets_at\":$R5}},\"after\":{\"five_hour\":{\"used_percentage\":99},\"seven_day\":{\"used_percentage\":77}}}"
@@ -192,6 +213,16 @@ codex_cases() { # codex_cases <label>
   wipe; { tc "$(rl "$(cw 90 300 $((R5 + 999)))" null)"; } | rollout old; sleep 1.1
   { tc "$(rl "$(cw 33 300 "$R5")" null)"; } > "$DAY/rollout-2026-11-26T02-00-00-0199a0b1-new.jsonl"; codex_done
   is "$1: the newest rollout file is the one read"   "$(g @agent_limit_codex_5h_used)" 33
+
+  # Models metered apart report under their own limit_id: the main allowance
+  # ("codex", or no id) is the one shown, wherever it sits in the tail.
+  ol() { printf '{"limit_id":"codex_other","primary":%s,"secondary":null}' "$1"; }
+  wipe; { tc "$(rl "$(cw 60 300 "$R5")" null)"; other; tc "$(ol "$(cw 3 300 "$R5")")"; other; } | rollout a; codex_done
+  is "$1: a record for another limit_id does not hide the main one" "$(g @agent_limit_codex_5h_used)" 60
+  wipe; { tc "{\"primary\":$(cw 61 300 "$R5"),\"secondary\":null}"; tc "$(ol "$(cw 3 300 "$R5")")"; } | rollout a; codex_done
+  is "$1: a record with no limit_id counts as the main one" "$(g @agent_limit_codex_5h_used)" 61
+  wipe; { tc "$(ol "$(cw 3 300 "$R5")")"; } | rollout a; codex_done
+  is "$1: with no main record in the tail the last one is used" "$(g @agent_limit_codex_5h_used)" 3
 
   # A sessions directory that is a symlink (kept on another disk, say).
   wipe; { tc "$(rl "$(cw 17 300 "$R5")" null)"; } | rollout a
@@ -304,11 +335,13 @@ is "install on a broken settings.json exits 1 and says so" "$rc:$(printf '%s\n' 
 is "and the kept original is untouched"              "$(jq -c .original "$S.statusline-agent-signal")" "$ORIG"
 cp "$TMPDIR/good" "$S"
 
-# settings.json as a symlink into a dotfiles repo, with its own mode.
-mkdir -p "$TMPDIR/dotfiles"; mv "$S" "$TMPDIR/dotfiles/settings.json"; ln -s "$TMPDIR/dotfiles/settings.json" "$S"; chmod 644 "$TMPDIR/dotfiles/settings.json"
+# settings.json as a symlink into a dotfiles repo, with its own mode. (The
+# link here is relative, as a dotfiles manager would make it.)
+mkdir -p "$TMPDIR/dotfiles"; mv "$S" "$TMPDIR/dotfiles/settings.json"; ln -s ../dotfiles/settings.json "$S"; chmod 644 "$TMPDIR/dotfiles/settings.json"
 "$AS" uninstall >/dev/null; "$AS" install-claude-statusline >/dev/null
 is "install and uninstall write through a symlinked settings.json" "$([ -L "$S" ] && echo link):$(jq -r '.statusLine.command' "$TMPDIR/dotfiles/settings.json" | grep -c statusline)" "link:1"
 is "and leave its mode alone"                        "$(find "$TMPDIR/dotfiles/settings.json" -perm 644 | wc -l | tr -d ' ')" 1
+is "and leave no temp file beside the real file"     "$(find "$TMPDIR/dotfiles" -type f | wc -l | tr -d ' ')" 1
 rm "$S"; mv "$TMPDIR/dotfiles/settings.json" "$S"
 is "install leaves no temp files"                    "$(find "$HOME/.claude" -name 'settings.json.??????' | wc -l | tr -d ' ')" 0
 "$AS" uninstall >/dev/null
@@ -318,6 +351,26 @@ is "uninstall removes the kept copy and leaves no temp files" "$(find "$HOME/.cl
 is "uninstall unsets the recorded limits and @agent_limits" "$(T show-options -g | grep -c '^@agent_limit')" 0
 "$AS" uninstall >/dev/null
 is "a second uninstall leaves the statusLine alone"  "$(jq -c '.statusLine' "$S")" "$ORIG"
+
+# Outside tmux uninstall still has the statusLine to put back, and says that
+# it left the server alone.
+printf '{"model":"x","statusLine":%s}\n' "$ORIG" > "$S"
+"$AS" install-claude-statusline >/dev/null
+out=$(TMUX='' "$AS" uninstall); rc=$?
+is "uninstall outside tmux restores the statusLine"  "$rc:$(jq -c '.statusLine' "$S")" "0:$ORIG"
+is "and says the server was left alone"              "$(printf '%s\n' "$out" | grep -c 'not inside tmux')" 1
+
+# A statusLine set by hand to the bare command, as the no-jq message tells you
+# to: the installer takes it over, and uninstall can then remove it.
+printf '{"model":"x","statusLine":{"type":"command","command":"\\"/old/place/bin/agent-signal\\" statusline","padding":1}}\n' > "$S"
+"$AS" install-claude-statusline >/dev/null; rc=$?
+is "install adopts a bare hand-wired statusLine"     "$rc:$(jq -c '.statusLine' "$S")" "0:{\"type\":\"command\",\"command\":\"\\\"$AS\\\" statusline\",\"padding\":1}"
+"$AS" uninstall >/dev/null
+is "and uninstall then removes it"                   "$(jq -c . "$S")" '{"model":"x"}'
+# One set by hand with a command of its own cannot be taken apart: left alone.
+printf '{"statusLine":{"type":"command","command":"/old/place/bin/agent-signal statusline mine.sh"}}\n' > "$S"
+err=$("$AS" install-claude-statusline 2>&1 >/dev/null); rc=$?
+is "install leaves a hand-wired chain alone and says why" "$rc:$(printf '%s\n' "$err" | grep -c 'set by hand')" "1:1"
 
 # No statusLine to begin with: one is added, and uninstall takes it away again.
 printf '{"model":"x"}\n' > "$S"

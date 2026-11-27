@@ -15,6 +15,14 @@ Claude runs hooks concurrently, so each update takes a lock keyed on the
 server socket and window id (a `mkdir` in `$TMPDIR`, reclaimed if a holder
 was killed) before reading and rewriting the window's state.
 
+**Writes only what changed.** tmux repaints every attached client whenever an
+option is set, even to the value it already has. So each step reads what is
+there first (the pane's state, the window's badge and tab style, the
+needs-you count, the usage meter) and writes only what differs. A tool call
+by an agent that is already working, the commonest event by far, writes
+nothing. Anything found wrong is still put right: a tab style a theme
+overwrote comes back on the window's next event.
+
 **Progress bar.** After every refresh and every `seen`, `refresh_progress`
 lists the clients and, for each whose `#{client_termtype}` matches
 `@agent_signal_progress_terminals`, writes `ESC ] 9 ; 4 ; state ; percent BEL`
@@ -69,7 +77,8 @@ assistant message. For Pro, Max and Ultra plans it carries
 `used_percentage` (0 to 100) and `resets_at` (epoch seconds). The object is
 absent until the session's first API response, either window can be
 missing, and Claude drops a window once its reset passes. A payload records
-the windows it has and leaves the others as they were. Only windows under
+the windows it has and leaves the others as they were. A window whose reset
+has already passed is not recorded: an idle session can still be holding one. Only windows under
 `rate_limits` count. Recording runs in the background, so your own status
 line command starts at once and never waits for it.
 
@@ -84,7 +93,9 @@ give or take a few minutes of rounding), not by position, and any other
 length is ignored. An older Codex wrote `resets_in_seconds` instead, which
 is counted from the moment it is read. A record with neither field keeps
 the reset already stored while that is still to come; otherwise no reset is
-stored, and that window has no pace.
+stored, and that window has no pace. If the tail holds records for more
+than one `limit_id` (a model metered apart from the main allowance), the
+one called `codex`, or with no id, is read.
 
 Every session reports what it last saw, so an idle one can be behind the
 others. For ten minutes after a record is stored, a report is ignored when
@@ -92,13 +103,17 @@ its window resets earlier, or when it is the same window with less used:
 within one window usage only grows. After ten minutes anything is taken, so
 a real drop (the provider resets usage, a plan changes) shows on the next
 report, and a stale figure that slips through is corrected by the next
-report from a session that is working. Each record is written in a single
-tmux command, so two sessions reporting at once cannot leave one window's
-usage beside another's reset.
+report from a session that is working. An agent's two windows share one
+record time, which is read once before either is written, so the second
+window is judged by the same clock as the first. Each record is written in
+a single tmux command, so two sessions reporting at once cannot leave one
+window's usage beside another's reset. Numbers that have not changed are
+not written again, which is why the record time can be up to five minutes
+behind the last report.
 
-**No polling.** `@agent_limits` is rebuilt when a window is recorded and on
-every agent event the plugin already handles, in one `show-options` call and
-one awk. Pace and staleness depend on the clock, so they only advance at
+**No polling.** `@agent_limits` is worked out when a window is recorded and
+on every agent event the plugin already handles, in one tmux call and one
+awk, and written only when the figure has changed. Pace and staleness depend on the clock, so they only advance at
 those moments. With every agent idle the meter is as old as the last event,
 which is also when the allowance is not being spent.
 

@@ -54,12 +54,13 @@ else
   for c in /opt/homebrew/bin/tmux /usr/local/bin/tmux /usr/bin/tmux /opt/homebrew/Cellar/tmux/*/bin/tmux /usr/local/Cellar/tmux/*/bin/tmux; do
     [ -x "$c" ] && TMUX_BIN=$c && break
   done
-  # (statusline still has the previous status line command to run.)
-  [ -n "$TMUX_BIN" ] || [ "${1:-}" = statusline ] || exit 0
+  # (statusline still has the previous status line command to run, and
+  # uninstall still has Claude's statusLine to put back.)
+  [ -n "$TMUX_BIN" ] || case ${1:-} in statusline|uninstall) ;; *) exit 0 ;; esac
 fi
 t() { "$TMUX_BIN" "$@"; }
 
-case ${1:-} in install-claude-hooks|install-claude-statusline|statusline|check|help|-h|--help|version|--version) ;; *) [ -n "${TMUX:-}" ] || exit 0 ;; esac
+case ${1:-} in install-claude-hooks|install-claude-statusline|statusline|uninstall|check|help|-h|--help|version|--version) ;; *) [ -n "${TMUX:-}" ] || exit 0 ;; esac
 # An agent launched from inside another agent's pane would report over its
 # parent, and its SessionStart would relabel the pane from Claude's registry.
 # AGENT_SIGNAL_DISABLE=1 on the nested command silences every report.
@@ -218,30 +219,38 @@ restore_tab() { # restore_tab <window>
 
 paint_window() { # paint_window <window> <state-or-hold>
   set -- "$1" "$(style_for "$2")" "$2"
-  if [ -z "$2" ]; then
-    t set-option -uw -t "$1" @agent_icon \; set-option -uw -t "$1" @agent_fg
-    restore_tab "$1"
-    return
+  icon=""; fg=""; style=""
+  if [ -n "$2" ]; then
+    icon=${2%% *}; rest=${2#* }; fg=${rest%% *}; bg=${rest#* }
+    # @agent_signal_tab_colour: all (every state with a bg), needs (only when a
+    # window needs you), off (badge only). "on" is kept as an alias of all.
+    colour_tab=1
+    case $(opt @agent_signal_tab_colour all) in
+      off) colour_tab=0 ;;
+      needs) needs_you "$3" || colour_tab=0 ;;
+    esac
+    [ "$bg" = default ] || [ "$colour_tab" = 0 ] || style="fg=$fg,bg=$bg,bold"
   fi
-  icon=${2%% *}; rest=${2#* }; fg=${rest%% *}; bg=${rest#* }
-  # @agent_signal_tab_colour: all (every state with a bg), needs (only when a
-  # window needs you), off (badge only). "on" is kept as an alias of all.
-  colour_tab=1
-  case $(opt @agent_signal_tab_colour all) in
-    off) colour_tab=0 ;;
-    needs) needs_you "$3" || colour_tab=0 ;;
-  esac
-  if [ "$bg" = default ] || [ "$colour_tab" = 0 ]; then
-    t set-option -w -t "$1" @agent_icon "$icon" \; set-option -w -t "$1" @agent_fg "$fg"
-    restore_tab "$1"
-  else
+  # What the tab shows now. tmux repaints every client on every option write,
+  # even of the value already there, so only what differs is written: an event
+  # that changes nothing (a tool call while already working) writes nothing.
+  IFS='	' read -r ci cf co cs <<EOF2
+$(t display -p -t "$1" '#{?@agent_icon,#{@agent_icon},-}	#{?@agent_fg,#{@agent_fg},-}	#{?@agent_tab_owned,1,-}	#{window-status-style}')
+EOF2
+  [ "$ci" = - ] && ci=""; [ "$cf" = - ] && cf=""
+  if [ "$ci" != "$icon" ] || [ "$cf" != "$fg" ]; then
+    if [ -n "$icon" ]; then t set-option -w -t "$1" @agent_icon "$icon" \; set-option -w -t "$1" @agent_fg "$fg"
+    else t set-option -uw -t "$1" @agent_icon \; set-option -uw -t "$1" @agent_fg; fi
+  fi
+  if [ -z "$style" ]; then
+    [ "$co" != 1 ] || restore_tab "$1"
+  elif [ "$co" != 1 ] || [ "$cs" != "$style" ]; then
     # Taking the tab over: remember the style that was there so it comes back.
-    if [ "$(t show-option -wqv -t "$1" @agent_tab_owned)" != 1 ]; then
+    if [ "$co" != 1 ]; then
       cur=$(t show-option -wqv -t "$1" window-status-style)
       if [ -n "$cur" ]; then t set-option -w -t "$1" @agent_tab_saved "$cur"; else t set-option -uw -t "$1" @agent_tab_saved; fi
     fi
-    t set-option -w -t "$1" @agent_icon "$icon" \; set-option -w -t "$1" @agent_fg "$fg" \
-      \; set-option -w -t "$1" window-status-style "fg=$fg,bg=$bg,bold" \; set-option -w -t "$1" @agent_tab_owned 1
+    t set-option -w -t "$1" window-status-style "$style" \; set-option -w -t "$1" @agent_tab_owned 1
   fi
 }
 
@@ -332,10 +341,11 @@ EOF2
     agg=""
   fi
 
-  if [ -n "$agg" ]; then t set-option -w -t "$win" @agent_state "$agg"; else t set-option -uw -t "$win" @agent_state; fi
-  # When the state changes, stamp it, so `next` can serve the longest wait first.
+  # Written only when the state changes, with a stamp, so `next` can serve the
+  # longest wait first.
   if [ "$agg" != "$prev" ]; then
-    if [ -n "$agg" ]; then t set-option -w -t "$win" @agent_since "$(date +%s)"; else t set-option -uw -t "$win" @agent_since; fi
+    if [ -n "$agg" ]; then t set-option -w -t "$win" @agent_state "$agg" \; set-option -w -t "$win" @agent_since "$(date +%s)"
+    else t set-option -uw -t "$win" @agent_state \; set-option -uw -t "$win" @agent_since; fi
   fi
 
   if [ -n "$hold" ] && ! needs_you "$agg"; then paint_window "$win" "$hold"; else paint_window "$win" "$agg"; fi
@@ -352,9 +362,13 @@ EOF2
 
 refresh_needs() { # count of windows needing you (blocked or ask), for titles and your own status line
   # Dead panes (remain-on-exit) are skipped so a crashed agent does not linger.
-  needs=$(t list-panes -a -F '#{window_id}	#{?@agent_pane_state,#{@agent_pane_state},-}	#{pane_dead}' \
-    | awk -F'	' '$3 != "1" && ($2 == "blocked" || $2 == "ask") && !seen[$1]++ { n++ } END { print n + 0 }')
-  if [ "$needs" -gt 0 ]; then t set-option -g @agent_needs "$needs"; else t set-option -gu @agent_needs; fi
+  # The count already published comes back on the same listing, and is only
+  # rewritten when it is wrong.
+  # shellcheck disable=SC2046  # two numbers, split on purpose
+  set -- $(t list-panes -a -F '#{window_id}	#{?@agent_pane_state,#{@agent_pane_state},-}	#{pane_dead}	#{?@agent_needs,#{@agent_needs},0}' \
+    | awk -F'	' '{ cur = $4 } $3 != "1" && ($2 == "blocked" || $2 == "ask") && !seen[$1]++ { n++ } END { print n + 0, cur + 0 }')
+  [ "${1:-0}" != "${2:-0}" ] || return 0
+  if [ "${1:-0}" -gt 0 ]; then t set-option -g @agent_needs "$1"; else t set-option -gu @agent_needs; fi
 }
 
 # --- terminal progress bar (OSC 9;4) ----------------------------------------
@@ -430,22 +444,32 @@ EOF2
   case $used in ''|*[!0-9]*) return 0 ;; esac
   [ -n "$lw" ] || return 0
   case $reset in ''|*[!0-9]*) case $secs in ''|*[!0-9]*) reset="" ;; *) reset=$((NOW + secs)) ;; esac ;; esac
+  # A window that has already reset says nothing about the one running now (an
+  # idle session can still be holding it).
+  [ -z "$reset" ] || [ "$reset" -gt "$NOW" ] || return 0
   lp="@agent_limit_${1}_${lw}"; la="@agent_limit_${1}_at"
   # What is stored, in one round trip: $1 its reset, $2 its used, $3 when.
   # shellcheck disable=SC2046  # three numbers, split on purpose
   set -- $(t show-options -g 2>/dev/null | awk -v p="$lp" -v a="$la" '
     $1 == p "_reset" { r = $2 } $1 == p "_used" { u = $2 } $1 == a { s = $2 } END { print r + 0, u + 0, s + 0 }')
+  # The agent's windows share one record time, so it is taken once, before
+  # either is written: the second must not find the first one's fresh stamp.
+  [ -n "$LIMIT_AT" ] || LIMIT_AT=$3
   # A report that names no reset belongs to the stored window while that one is still to come.
   [ -n "$reset" ] || [ "$1" -le "$NOW" ] || reset=$1
   # A session reports what it last saw, so an idle one can be behind the
   # others. For ten minutes after a record, an earlier window does not replace
   # it, and the same window (resets within a minute) only with as much used or
   # more. After that anything is taken: a real drop must not stick.
-  if [ -n "$reset" ] && [ $((NOW - $3)) -lt 600 ]; then
+  if [ -n "$reset" ] && [ $((NOW - LIMIT_AT)) -lt 600 ]; then
     [ "$reset" -ge $(($1 - 60)) ] || return 0
     [ "$reset" -gt $(($1 + 60)) ] || [ "$used" -ge "$2" ] || return 0
   fi
   [ "$used" -le 100 ] || used=100
+  # Nothing new since a record under five minutes old: no write. Every option
+  # write makes tmux repaint every client, and this runs on each status line
+  # update of every Claude session.
+  if [ "$used" = "$2" ] && [ "${reset:-0}" = "$1" ] && [ $((NOW - LIMIT_AT)) -lt 300 ]; then return 0; fi
   # One tmux command, so another session never sees half a record.
   if [ -n "$reset" ]; then set -- set-option -g "${lp}_reset" "$reset"; else set -- set-option -gu "${lp}_reset"; fi
   t set-option -g "${lp}_used" "$used" \; set-option -g "$la" "$NOW" \; "$@"
@@ -456,7 +480,12 @@ limits_codex() { # the last rate_limits record in the tail of the newest rollout
   # (The trailing slash makes find follow a sessions directory that is a symlink.)
   lf=$(find "$ld/" -name 'rollout-*.jsonl' -mtime -1 -exec ls -t {} + 2>/dev/null | head -1)
   [ -n "$lf" ] || return 0
-  JSON=$(tail -n 100 "$lf" | grep '"rate_limits"[[:space:]]*:[[:space:]]*{' | tail -1)
+  # Codex may meter some models apart and report each under its own limit_id.
+  # The main allowance is the one called "codex", or with no id at all; only
+  # when the tail holds none of those is the last record of any kind used.
+  JSON=$(tail -n 100 "$lf" | awk '/"rate_limits"[[:space:]]*:[[:space:]]*[{]/ { any = $0
+      if ($0 !~ /"limit_id"[[:space:]]*:[[:space:]]*"/ || $0 ~ /"limit_id"[[:space:]]*:[[:space:]]*"codex"/) main = $0 }
+    END { print (main != "" ? main : any) }')
   [ -n "$JSON" ] || return 0
   limit_window codex primary; limit_window codex secondary
 }
@@ -471,12 +500,14 @@ limits_clear() { for o in $(t show-options -g | sed -n 's/^\(@agent_limit[a-z0-9
 
 limits() { # limits [claude|codex]: record that agent's windows, then rebuild @agent_limits
   limits_on || return 0
-  NOW=${AGENT_SIGNAL_NOW:-$(date +%s)}
+  NOW=${AGENT_SIGNAL_NOW:-$(date +%s)}; LIMIT_AT=""
   case ${1:-} in
     claude) limit_window claude five_hour 5h; limit_window claude seven_day 7d ;;
     codex)  limits_codex ;;
   esac
-  out=$(t show-options -g | awk -v now="$NOW" '
+  # The figure in force comes back on the same round trip (the "=" line), and
+  # the answer is "=" when it is still right: then nothing is written.
+  out=$(t show-options -g \; display-message -p '=#{@agent_limits}' | awk -v now="$NOW" '
     function window(k, len,    used, reset) { # sets lvl (0 nothing to show, 1 plain, 2 orange, 3 red), left, plain, txt
       lvl = 0; if (!((k "_used") in v)) return
       used = v[k "_used"] + 0; reset = v[k "_reset"]
@@ -486,6 +517,7 @@ limits() { # limits [claude|codex]: record that agent's windows, then rebuild @a
       txt = lvl > 1 ? "#[fg=" (lvl == 3 ? "red" : "colour208") "]" plain "#[default]" : plain
     }
     BEGIN { pace = 10 }
+    /^=/ { cur = substr($0, 2); next }
     $1 ~ /^@agent_limit_/ { v[substr($1, 14)] = $2 }
     $1 == "@agent_signal_limits_show" { show = $2 }
     $1 == "@agent_signal_limits_pace" { pace = $2 + 0 }
@@ -500,9 +532,13 @@ limits() { # limits [claude|codex]: record that agent's windows, then rebuild @a
         if (now - v[a[i] "_at"] > 21600) s = "#[fg=colour245]" a[i + 1] p "#[default]"; else s = a[i + 1] s
         out = out (out == "" ? "" : " ") s
       }
-      print out
+      print (out == cur ? "=" : "!" out)
     }')
-  if [ -n "$out" ]; then t set-option -g @agent_limits "$out"; else t set-option -gu @agent_limits; fi
+  case $out in
+    "="|"") ;;                                # still right, or tmux did not answer
+    "!") t set-option -gu @agent_limits ;;
+    *)   t set-option -g @agent_limits "${out#!}" ;;
+  esac
 }
 
 # --- Claude Code statusLine entry ---------------------------------------------
@@ -516,7 +552,8 @@ statusline() { # statusline [command]
   # exec, not a redirection on the call: dash keeps a copy of the old stdout
   # for the length of a redirected function call, and Claude would wait on it.
   [ -z "${TMUX:-}" ] || (exec >/dev/null 2>&1; limits claude &)
-  next=${1:-$(opt @agent_signal_statusline_next "")}
+  next=${1:-}
+  [ -n "$next" ] || [ -z "${TMUX:-}" ] || next=$(opt @agent_signal_statusline_next "")
   [ -n "$next" ] || return 0
   # (A command that reads no stdin closes the pipe on us; that is not an error.)
   printf '%s' "$JSON" 2>/dev/null | sh -c "$next"
@@ -535,14 +572,23 @@ set_state() { # set_state <state> [pane]
   win=$(window_of "$pane") || exit 0
   lock_window "$win"
   case $1 in
-    working|blocked|ask|done) t set-option -p -t "$pane" @agent_pane_state "$1" ;;
-    idle|clear|"")        t set-option -up -t "$pane" @agent_pane_state ;;
+    working|blocked|ask|done) want=$1 ;;
+    idle|clear|"")        want="" ;;
     *) echo "agent-signal: unknown state '$1'" >&2; exit 1 ;;
   esac
+  # What the pane says now (read under the lock), so that only what differs is
+  # written: see paint_window.
+  IFS='	' read -r cst ck cn <<EOF2
+$(t display -p -t "$pane" '#{?@agent_pane_state,#{@agent_pane_state},-}	#{?@agent_kind,#{@agent_kind},-}	#{?@agent_name,1,-}')
+EOF2
+  [ "$cst" = - ] && cst=""
+  if [ "$want" != "$cst" ]; then
+    if [ -n "$want" ]; then t set-option -p -t "$pane" @agent_pane_state "$want"; else t set-option -up -t "$pane" @agent_pane_state; fi
+  fi
   if [ "$1" = clear ]; then
-    t set-option -up -t "$pane" @agent_kind; t set-option -up -t "$pane" @agent_name
+    [ "$ck$cn" = -- ] || t set-option -up -t "$pane" @agent_kind \; set-option -up -t "$pane" @agent_name
   else
-    t set-option -p -t "$pane" @agent_kind "${AGENT_KIND:-agent}"
+    [ "$ck" = "${AGENT_KIND:-agent}" ] || t set-option -p -t "$pane" @agent_kind "${AGENT_KIND:-agent}"
   fi
   needs_you "$1" && bell "$pane"
   refresh_window "$win" event
@@ -701,16 +747,25 @@ install_claude_hooks() {
     def add($ev): .hooks[$ev] = ((.hooks[$ev] // []) | map(select((.hooks // []) | any(.command | tostring | contains("agent-signal\" hook") or contains("agent-signal hook")) | not)) + [entry($ev)]);
     .hooks //= {} |
     reduce ("SessionStart","UserPromptSubmit","PreToolUse","PostToolUse","PermissionRequest","Notification","Stop","StopFailure","SessionEnd") as $ev (.; add($ev))
-  ' && echo "hooks merged into $settings (backup: $settings.bak-agent-signal)"
+  ' && echo "hooks merged into $settings (backup: $settings.bak-agent-signal)" && return 0
+  echo "agent-signal: could not rewrite $settings; nothing changed" >&2; exit 1
 }
 
-# Rewrite $settings with a jq filter, through the file itself rather than by
-# moving a new one over it: a settings.json that is a symlink into a dotfiles
-# repo stays one, and its mode stays as it was. Nothing is written if jq fails.
+# Rewrite $settings with a jq filter. The new content goes to a file beside
+# the real one, which is then renamed over it, so the settings are never seen
+# empty or half written. A settings.json that is a symlink into a dotfiles
+# repo stays one (the link is followed first), and the mode is kept (cp -p
+# gives the new file the old one's before its content is replaced). Nothing
+# changes if jq fails.
 settings_edit() { # settings_edit <jq arguments>
-  tmp=$(mktemp "${TMPDIR:-/tmp}/agent-signal.XXXXXX") || return 1
+  real=$settings
+  while [ -L "$real" ]; do
+    l=$(readlink "$real") || return 1
+    case $l in /*) real=$l ;; *) real=$(dirname "$real")/$l ;; esac
+  done
+  tmp=$(mktemp "$real.XXXXXX") || return 1
   trap 'rm -f "$tmp"' EXIT INT TERM
-  if jq "$@" "$settings" > "$tmp" && [ -s "$tmp" ]; then cat "$tmp" > "$settings"; rc=$?; else rc=1; fi
+  if cp -p "$real" "$tmp" && jq "$@" "$real" > "$tmp" && [ -s "$tmp" ]; then mv "$tmp" "$real"; rc=$?; else rc=1; fi
   rm -f "$tmp"; return "$rc"
 }
 
@@ -723,15 +778,27 @@ install_claude_statusline() {
   command -v jq >/dev/null 2>&1 || { echo "jq is required to edit $settings; by hand, set statusLine.command to: \"$SELF\" statusline" >&2; exit 1; }
   [ -f "$settings" ] || { mkdir -p "$(dirname "$settings")" && printf '{}\n' > "$settings"; }
   restore_claude_statusline >/dev/null   # a re-run starts from the original (the plugin may have moved)
-  case $(jq -r '.statusLine.command // ""' "$settings" 2>/dev/null) in *agent-signal*" statusline"*)
-    echo "statusLine in $settings already runs agent-signal statusline and is not as the installer left it; nothing changed" >&2; exit 1 ;; esac
+  adopt=0
+  case $(jq -r '.statusLine.command // ""' "$settings" 2>/dev/null) in
+    # Set by hand to the bare command, as the message above says to do without
+    # jq: there was nothing before it that we know of, so take it over.
+    *agent-signal\"" statusline"|*"agent-signal statusline") [ -f "$saved" ] || adopt=1 ;;
+    *agent-signal*" statusline"*) ;;
+    *) adopt=no ;;
+  esac
+  if [ "$adopt" = 0 ]; then
+    if [ -f "$saved" ]; then why="is not as the installer left it"; else why="was set by hand with a command of its own"; fi
+    echo "statusLine in $settings already runs agent-signal statusline and $why; nothing changed" >&2; exit 1
+  fi
   # Worked out before anything is written: a settings.json that does not parse changes nothing.
-  new=$(jq -c --arg bin "$SELF" '(.statusLine.command // null) as $prev | {original: (.statusLine // null),
+  new=$(jq -c --arg bin "$SELF" --arg adopt "$adopt" '(if $adopt == "1" then null else .statusLine end) as $was
+    | ($was.command // null) as $prev | {original: $was,
     installed: ((.statusLine // {}) + {type: "command", command: ("\"" + $bin + "\" statusline" + (if $prev then " " + ($prev | @sh) else "" end))})}' "$settings" 2>/dev/null)
   [ -n "$new" ] || { echo "agent-signal: $settings is not valid JSON; nothing changed" >&2; exit 1; }
   # shellcheck disable=SC2016  # $s is jq's variable
   printf '%s\n' "$new" > "$saved" && settings_edit --argjson s "$new" '.statusLine = $s.installed' \
-    && echo "statusLine set in $settings (original kept in $saved)"
+    && echo "statusLine set in $settings (original kept in $saved)" && return 0
+  echo "agent-signal: could not rewrite $settings; nothing changed" >&2; exit 1
 }
 
 restore_claude_statusline() { # put back the statusLine the installer replaced, unless it has been edited since
@@ -802,6 +869,11 @@ check_limits() { # the usage meter lines of check (uses check's say)
 # --- uninstall -------------------------------------------------------------
 # The inverse of agent-signal.tmux plus a sweep of live windows and panes.
 uninstall() {
+  if [ -z "${TMUX:-}" ] || [ -z "$TMUX_BIN" ]; then
+    restore_claude_statusline
+    echo "agent-signal: not inside tmux, so the server was left alone. Run uninstall from a pane to remove formats, hooks and key bindings."
+    return 0
+  fi
   refresh_progress clear
   # The window formats and border styles go back to what the entry file found.
   for o in window-status-format window-status-current-format pane-border-style pane-active-border-style; do

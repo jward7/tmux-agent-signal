@@ -103,6 +103,14 @@ shown, and with no agent to show the option is unset.
 A window whose reset time has passed is dropped: the allowance is new and
 the old number means nothing.
 
+A coloured or dimmed figure ends with `#[default]`, which goes back to the
+status line's base style, not to a style you set just before the meter. If
+the rest of your `status-right` is styled, set the style again after it:
+
+```tmux
+set -g status-right '#[fg=blue]#{@agent_limits}#[fg=blue] %H:%M'
+```
+
 Nothing runs on redraw and there is no timer, so the meter moves when an
 agent reports or any agent event fires, and not in between. With every
 agent idle the last value stays put. `agent-signal limits` recomputes it on
@@ -124,6 +132,8 @@ format of your own:
   resets. Unset when the agent did not say. Check it before trusting
   `_used`: a recorded window stays until a newer one replaces it.
 - `@agent_limit_<agent>_at`: epoch seconds when that agent last reported.
+  While the numbers do not change it is refreshed at most every five
+  minutes, so it can be that far behind.
 
 If Claude's status line is set by hand, `@agent_signal_statusline_next`
 names the command `agent-signal statusline` runs after recording, with the

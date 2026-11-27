@@ -20,7 +20,7 @@ ancestor of the caller, else the current client's window, unless one is given.
 | `check` | report what is wired on this server and what is missing; exit 1 if broken |
 | `install-claude-hooks` | merge the hooks into `~/.claude/settings.json` (needs jq); a symlinked settings file is written through, not replaced |
 | `install-claude-statusline` | set `statusLine` in `~/.claude/settings.json` to `agent-signal statusline`, wrapped around the status line you had (needs jq) |
-| `uninstall` | reverse everything the entry file set on the server, and restore the `statusLine` the installer replaced, unless it has been edited since |
+| `uninstall` | reverse everything the entry file set on the server, and restore the `statusLine` the installer replaced, unless it has been edited since. Outside tmux it restores the `statusLine` and leaves the server alone |
 | `lock-path <window>` | print the lock directory for a window (debugging) |
 | `help`, `version` | |
 
@@ -40,10 +40,13 @@ ancestor of the caller, else the current client's window, unless one is given.
 | any event from a background job (`CLAUDE_JOB_DIR` set) | ignored: the pane's state belongs to the interactive session |
 
 Hooks are registered `async` so they never delay Claude. Each call is a
-handful of tmux commands: on an 18-pane server one event costs about a dozen
-tmux client calls, roughly half a second on a slow machine and much less on a
-fast one. Updates to the same window are serialised with a lock, since Claude
-runs hooks concurrently.
+handful of tmux commands: an event that changes nothing (a tool call by an
+agent that is already working, which is most of them) costs about fourteen
+tmux client calls, all of them reads. An option is written only when its
+value differs, because tmux repaints every attached client on every option
+write, even of the value already there, and several agents at work would
+otherwise repaint the screen several times a second. Updates to the same
+window are serialised with a lock, since Claude runs hooks concurrently.
 
 ## The usage meter and Claude's status line
 
@@ -69,9 +72,12 @@ replaced it, it is yours: `uninstall` leaves it, says so, and leaves the
 kept original where it is. Running the installer again is safe on the same
 terms: an untouched install is redone from the original, which also
 follows a plugin that has moved, and an edited one is refused. A
-`settings.json` that does not parse changes nothing. Both commands write
-through the file, so a `settings.json` that is a symlink into a dotfiles
-repo stays one and keeps its mode.
+`statusLine` you set by hand to the bare command is taken over, so
+`uninstall` can remove it; one set by hand with a command of its own is
+left alone. A `settings.json` that does not parse changes nothing. Both
+commands write a complete new file beside the real one and rename it into
+place, so the settings are never seen half written; a `settings.json` that
+is a symlink into a dotfiles repo stays one and keeps its mode.
 
 Run the installer from the copy tpm manages (`~/.tmux/plugins/...`): the
 path it writes is its own, and the copy Claude Code keeps for its plugin

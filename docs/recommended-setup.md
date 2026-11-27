@@ -43,6 +43,14 @@ claude() {
 }
 ```
 
+**Leave `status-interval` at its default.** tmux re-runs every `#(command)`
+in your status line once per interval. At `status-interval 1` a status line
+with a few shell segments (CI status, battery, a formatted date) launches a
+dozen or more processes a second for as long as tmux is running, which adds
+up next to several busy agents. The default of 15 seconds is enough for a
+clock that shows minutes; the plugin's own badges and usage meter are tmux
+options and update the moment they change, whatever the interval.
+
 **tmux settings Claude Code wants** (from its terminal docs):
 
 ```tmux

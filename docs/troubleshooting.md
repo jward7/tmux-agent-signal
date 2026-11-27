@@ -24,6 +24,13 @@
   That tmux only notices a pane has died on its next child exit, so the count
   drops on the next hook or `agent-signal needs`. tmux 3.5 and later fixed
   this.
+- **The status bar flickers, or tmux feels slow with several agents
+  running.** Update the plugin: versions up to 0.5.0 rewrote their options on
+  every agent event, and tmux repaints every client on every option write. If it
+  persists, look at your own status line: `status-interval 1` re-runs every
+  `#(command)` in `status-left` and `status-right` once a second, all the
+  time. The default of 15 is plenty for a clock that shows minutes. The
+  plugin itself runs nothing on a timer.
 - **The usage meter shows nothing.** `agent-signal check` says whether it is
   on, what it currently reads, and whether Claude's status line runs the
   plugin. It needs all three of `@agent_signal_limits on`, `#{@agent_limits}`

@@ -36,8 +36,9 @@ that pane. Nothing else on the bar is the plugin's.
 ## Why
 
 - **No daemon, no polling, no sidebar.** The agent's own lifecycle hooks write
-  a few tmux options. The status line reads them natively. Nothing runs on
-  redraw.
+  a few tmux options, and only when a value changes, so a busy agent does
+  not make tmux repaint. The status line reads them natively. Nothing runs
+  on redraw.
 - **Triage, not just a badge.** Permission prompts, questions and finished
   turns are told apart. `prefix + N` goes to the most urgent window that has
   waited longest. Flag a window as *wait* or *park* to skip it.

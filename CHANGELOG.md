@@ -1,5 +1,49 @@
 # Changelog
 
+## Unreleased
+
+- **No more repainting for nothing.** tmux repaints every attached client on
+  every option write, even when the value written is the one already there,
+  and the plugin rewrote its options on every agent event: five writes for
+  a tool call by an agent that was already working, six with the usage
+  meter on, and two more for each Claude status line update. With several
+  agents busy that was several full repaints a second, which showed as a
+  flickering status bar. Every write is now made only when the value
+  differs, so an event that changes nothing writes nothing (and makes 14
+  tmux calls instead of 18). What is skipped is only what is already
+  right: a tab style or count that something else changed is still put
+  back by the next event.
+- Usage meter:
+  - The weekly figure could never drop while the 5-hour window arrived in
+    the same report, because the two shared one record time. The time is
+    now taken once, before either window is written.
+  - A window that has already reset is no longer recorded. After ten
+    minutes an idle session still holding one could replace the running
+    window and blank the meter.
+  - Unchanged numbers are not rewritten, so `@agent_limit_<agent>_at` moves
+    at most every five minutes while nothing changes.
+  - Codex: when the log tail holds records for several `limit_id`s, the
+    main allowance (`codex`, or no id) is the one read. Still unverified
+    against a real log.
+  - A coloured figure ends with `#[default]`; the docs now say to re-apply
+    your own style after it.
+- `statusLine` installer and `uninstall`:
+  - `settings.json` is replaced by renaming a complete new file over the
+    real one (following a symlink, keeping the mode), so a full disk or a
+    kill mid-write can no longer leave it empty.
+  - `uninstall` run outside tmux now restores the `statusLine` and says the
+    server was left alone, instead of doing nothing.
+  - A `statusLine` set by hand to the bare `agent-signal statusline`, as the
+    no-jq message tells you to, is taken over by the installer (and so can
+    be removed by `uninstall`) instead of being refused as "edited".
+  - A failed write is reported.
+- `agent-signal statusline` makes no tmux call outside tmux.
+- Tests: `t-quiet.sh` counts tmux writes per event with a stand-in tmux; the
+  test server runs with the test's own `HOME` again (it could read the real
+  Claude session registry), and cleanup waits for the pane shells so they
+  no longer race the removal of the temp directory. 627 checks across 31
+  files.
+
 ## 0.5.0 (2026-11-27)
 
 One look instead of a theme to configure, pane borders and a terminal

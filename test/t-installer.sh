@@ -27,6 +27,8 @@ ln -s "$FIX/dotfiles/settings.json" "$FIX/.claude/settings.json"
 HOME=$FIX "$AS" install-claude-hooks >/dev/null
 is "installer writes through a symlinked settings.json" "$([ -L "$FIX/.claude/settings.json" ] && echo link):$(jq '.hooks | keys | length' "$FIX/dotfiles/settings.json")" "link:9"
 is "installer leaves the file's mode alone"       "$(find "$FIX/dotfiles/settings.json" -perm 644 | wc -l | tr -d ' ')" 1
+is "installer leaves nothing else beside the real file" "$(find "$FIX/dotfiles" -type f | wc -l | tr -d ' ')" 1
+is "nor a temp file beside the link"              "$(find "$FIX/.claude" -name 'settings.json.??????' | wc -l | tr -d ' ')" 0
 rm -rf "$FIX"
 
 # No settings.json at all (nor ~/.claude): the installer starts one.
