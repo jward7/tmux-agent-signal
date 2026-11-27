@@ -92,6 +92,13 @@ agent reports or any agent event fires, and not in between. With every
 agent idle the last value stays put. `agent-signal limits` recomputes it on
 demand.
 
+Switched off again, the meter and its data are unset when the plugin next
+loads (reloading `tmux.conf` does it) or when you run `agent-signal limits`.
+
+There is one set of numbers per agent. Two Claude accounts on one tmux
+server (`CLAUDE_CONFIG_DIR`) would overwrite each other, and the installer
+only knows `~/.claude/settings.json`.
+
 What `@agent_limits` is built from is published too, all global, for a
 format of your own:
 

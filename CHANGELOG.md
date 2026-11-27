@@ -15,6 +15,9 @@
   agent events. `@agent_signal_limits_show remaining|used`,
   `agent-signal limits`, and the raw `@agent_limit_*` options. Off by
   default, and with it off nothing is recorded or published.
+- `install-claude-hooks` writes through `~/.claude/settings.json` instead of
+  moving a new file over it: a settings file that is a symlink into a
+  dotfiles repo stays one, and its mode is kept.
 
 - **Terminal progress bar.** On iTerm2 3.6+, WezTerm and Ghostty the bar at
   the top of the terminal tab follows the window on screen: moving while its

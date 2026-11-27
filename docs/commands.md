@@ -15,12 +15,12 @@ ancestor of the caller, else the current client's window, unless one is given.
 | `sync` | pull names and presence from Claude's session registry |
 | `needs` | recompute the needs-you count (`@agent_needs`) |
 | `progress [print\|clear]` | redraw the terminal progress bar; `print` lists `tty<TAB>value` instead of writing, `clear` hides it |
-| `limits` | recompute the usage meter (`@agent_limits`); does nothing unless `@agent_signal_limits` is `on` |
-| `statusline [command]` | Claude Code `statusLine` entry: records the usage limits in the JSON on stdin, then runs `command` (else `@agent_signal_statusline_next`) with the same stdin, printing its output and keeping its exit status. With no command it prints nothing |
+| `limits` | recompute the usage meter (`@agent_limits`); with `@agent_signal_limits` off, unset it and its `@agent_limit_*` data |
+| `statusline [command]` | Claude Code `statusLine` entry: records the usage limits in the JSON on stdin in the background, and runs `command` (else `@agent_signal_statusline_next`) with the same stdin, printing its output and keeping its exit status. With no command it prints nothing |
 | `check` | report what is wired on this server and what is missing; exit 1 if broken |
-| `install-claude-hooks` | merge the hooks into `~/.claude/settings.json` (needs jq) |
+| `install-claude-hooks` | merge the hooks into `~/.claude/settings.json` (needs jq); a symlinked settings file is written through, not replaced |
 | `install-claude-statusline` | set `statusLine` in `~/.claude/settings.json` to `agent-signal statusline`, wrapped around the status line you had (needs jq) |
-| `uninstall` | reverse everything the entry file set on the server, and restore the `statusLine` the installer replaced |
+| `uninstall` | reverse everything the entry file set on the server, and restore the `statusLine` the installer replaced, unless it has been edited since |
 | `lock-path <window>` | print the lock directory for a window (debugging) |
 | `help`, `version` | |
 
@@ -57,11 +57,21 @@ plugin. `install-claude-statusline` rewrites only `statusLine.command`:
 
 Your old command still draws the status line: it gets the same JSON on
 stdin, and its output and exit status pass straight through, inside tmux or
-out of it. With no old command, nothing is printed and Claude shows no
-status line. The setting as it was is kept in
-`~/.claude/settings.json.statusline-agent-signal`, and `uninstall` puts it
-back unless you have changed `statusLine` since. Running the installer again
-is safe: it starts from the kept original.
+out of it. It is run with `sh -c`, so an inline command written in bash-only
+syntax belongs in a script of its own. With no old command, nothing is
+printed and Claude shows no status line.
+
+The setting as it was, and what replaced it, are kept in
+`~/.claude/settings.json.statusline-agent-signal`. `uninstall` puts the
+original back only while `statusLine` is still exactly what the installer
+wrote. If you have edited it since (the wrapped command, `padding`), or
+replaced it, it is yours: `uninstall` leaves it, says so, and leaves the
+kept original where it is. Running the installer again is safe on the same
+terms: an untouched install is redone from the original, which also
+follows a plugin that has moved, and an edited one is refused. A
+`settings.json` that does not parse changes nothing. Both commands write
+through the file, so a `settings.json` that is a symlink into a dotfiles
+repo stays one and keeps its mode.
 
 Run the installer from the copy tpm manages (`~/.tmux/plugins/...`): the
 path it writes is its own, and the copy Claude Code keeps for its plugin

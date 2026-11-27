@@ -31,7 +31,7 @@
 #   agent-signal sync                          pull names/presence from ~/.claude/sessions
 #   agent-signal needs                         recompute the needs-you count
 #   agent-signal progress [print|clear]        redraw the terminal progress bar (print: show, don't write)
-#   agent-signal limits                        recompute the usage meter (@agent_limits)
+#   agent-signal limits                        recompute the usage meter (@agent_limits), or clear it when switched off
 #   agent-signal statusline [command]          Claude Code statusLine entry: record usage limits, then run command
 #   agent-signal install-claude-hooks          merge hooks into ~/.claude/settings.json (needs jq)
 #   agent-signal install-claude-statusline     point Claude's statusLine here, keeping yours (needs jq)
@@ -408,13 +408,14 @@ refresh_progress() { # refresh_progress [print|clear]: print lists "tty<TAB>valu
 # agent event, so pace and staleness only move when something happens.
 limits_on() { [ "$(opt @agent_signal_limits off)" = on ]; }
 
-limit_window() { # limit_window <agent> <json-key> [5h|7d]: record the window at "key" in $JSON
+limit_window() { # limit_window <agent> <json-key> [5h|7d]: record the window at "key" of rate_limits in $JSON
   if command -v jq >/dev/null 2>&1; then
-    lf=$(printf '%s' "$JSON" | jq -r --arg k "$2" '[.. | .[$k]? | objects] | last // empty
+    lf=$(printf '%s' "$JSON" | jq -r --arg k "$2" '[.. | .rate_limits? | objects | .[$k] | objects] | last // empty
       | "\(.used_percentage // .used_percent // "-") \(.resets_at // "-") \(.window_minutes // "-") \(.resets_in_seconds // "-")"' 2>/dev/null)
   else
-    # A window is a flat object, so its body runs to the first closing brace.
-    lo=$(printf '%s' "$JSON" | tr -d '\n' | sed -n "s/.*\"$2\"[[:space:]]*:[[:space:]]*{\([^{}]*\)}.*/\1/p")
+    # The first "key" once rate_limits has opened. A window is a flat object,
+    # so its body runs to the first closing brace.
+    lo=$(printf '%s' "$JSON" | tr -d '\n' | sed -n 's/.*"rate_limits"[[:space:]]*:[[:space:]]*{//p' | grep -o "\"$2\"[[:space:]]*:[[:space:]]*{[^{}]*}" | head -1)
     lf=$(for lk in 'used_percent[a-z]*' resets_at window_minutes resets_in_seconds; do
       ln=$(printf '%s' "$lo" | sed -n "s/.*\"$lk\"[[:space:]]*:[[:space:]]*\([0-9][0-9.]*\).*/\1/p"); printf '%s ' "${ln:--}"; done)
   fi
@@ -422,27 +423,38 @@ limit_window() { # limit_window <agent> <json-key> [5h|7d]: record the window at
 $lf
 EOF2
   # Codex names its windows by position, which moves (a plan may have only a
-  # weekly or a monthly one), so the length decides which window this is.
-  lw=${3:-}; case $mins in 300) lw=5h ;; 10080) lw=7d ;; esac
+  # weekly or a monthly one), so the length decides which window this is,
+  # give or take a few minutes of rounding.
+  lw=${3:-}; case ${mins%%.*} in 29[5-9]|30[0-5]) lw=5h ;; 100[78][0-9]|10090) lw=7d ;; esac
   used=${used%%.*}; reset=${reset%%.*}; secs=${secs%%.*}
   case $used in ''|*[!0-9]*) return 0 ;; esac
   [ -n "$lw" ] || return 0
   case $reset in ''|*[!0-9]*) case $secs in ''|*[!0-9]*) reset="" ;; *) reset=$((NOW + secs)) ;; esac ;; esac
+  lp="@agent_limit_${1}_${lw}"; la="@agent_limit_${1}_at"
+  # What is stored, in one round trip: $1 its reset, $2 its used, $3 when.
+  # shellcheck disable=SC2046  # three numbers, split on purpose
+  set -- $(t show-options -g 2>/dev/null | awk -v p="$lp" -v a="$la" '
+    $1 == p "_reset" { r = $2 } $1 == p "_used" { u = $2 } $1 == a { s = $2 } END { print r + 0, u + 0, s + 0 }')
+  # A report that names no reset belongs to the stored window while that one is still to come.
+  [ -n "$reset" ] || [ "$1" -le "$NOW" ] || reset=$1
   # A session reports what it last saw, so an idle one can be behind the
-  # others: an earlier window never replaces a later one, and within one
-  # window (resets within a minute of each other) usage only grows.
-  old=$(opt "@agent_limit_${1}_${lw}_reset" 0)
-  if [ -n "$reset" ] && [ "$reset" -le $((old + 60)) ]; then
-    [ "$reset" -ge $((old - 60)) ] && [ "$used" -ge "$(opt "@agent_limit_${1}_${lw}_used" 0)" ] || return 0
+  # others. For ten minutes after a record, an earlier window does not replace
+  # it, and the same window (resets within a minute) only with as much used or
+  # more. After that anything is taken: a real drop must not stick.
+  if [ -n "$reset" ] && [ $((NOW - $3)) -lt 600 ]; then
+    [ "$reset" -ge $(($1 - 60)) ] || return 0
+    [ "$reset" -gt $(($1 + 60)) ] || [ "$used" -ge "$2" ] || return 0
   fi
   [ "$used" -le 100 ] || used=100
-  t set-option -g "@agent_limit_${1}_${lw}_used" "$used" \; set-option -g "@agent_limit_${1}_at" "$NOW"
-  if [ -n "$reset" ]; then t set-option -g "@agent_limit_${1}_${lw}_reset" "$reset"; else t set-option -gu "@agent_limit_${1}_${lw}_reset"; fi
+  # One tmux command, so another session never sees half a record.
+  if [ -n "$reset" ]; then set -- set-option -g "${lp}_reset" "$reset"; else set -- set-option -gu "${lp}_reset"; fi
+  t set-option -g "${lp}_used" "$used" \; set-option -g "$la" "$NOW" \; "$@"
 }
 
 limits_codex() { # the last rate_limits record in the tail of the newest rollout log
   ld="${CODEX_HOME:-$HOME/.codex}/sessions"; [ -d "$ld" ] || return 0
-  lf=$(find "$ld" -name 'rollout-*.jsonl' -mtime -1 -exec ls -t {} + 2>/dev/null | head -1)
+  # (The trailing slash makes find follow a sessions directory that is a symlink.)
+  lf=$(find "$ld/" -name 'rollout-*.jsonl' -mtime -1 -exec ls -t {} + 2>/dev/null | head -1)
   [ -n "$lf" ] || return 0
   JSON=$(tail -n 100 "$lf" | grep '"rate_limits"[[:space:]]*:[[:space:]]*{' | tail -1)
   [ -n "$JSON" ] || return 0
@@ -455,6 +467,8 @@ limits_codex() { # the last rate_limits record in the tail of the newest rollout
 # the window by more than @agent_signal_limits_pace points; red at 100%. A
 # window whose reset has passed is dropped, and an agent not heard from for
 # six hours is dimmed.
+limits_clear() { for o in $(t show-options -g | sed -n 's/^\(@agent_limit[a-z0-9_]*\) .*/\1/p'); do t set-option -gu "$o"; done; }
+
 limits() { # limits [claude|codex]: record that agent's windows, then rebuild @agent_limits
   limits_on || return 0
   NOW=${AGENT_SIGNAL_NOW:-$(date +%s)}
@@ -492,13 +506,14 @@ limits() { # limits [claude|codex]: record that agent's windows, then rebuild @a
 }
 
 # --- Claude Code statusLine entry ---------------------------------------------
-# Claude pipes its status JSON here. The usage windows in it are recorded, then
-# the command that was the status line before us (the argument the installer
-# wrote, else @agent_signal_statusline_next) gets the same stdin and decides
-# what is printed and the exit status. Without one, nothing is printed.
+# Claude pipes its status JSON here. The usage windows in it are recorded in
+# the background, so the status line never waits for that, and the command
+# that was the status line before us (the argument the installer wrote, else
+# @agent_signal_statusline_next) gets the same stdin and decides what is
+# printed and the exit status. Without one, nothing is printed.
 statusline() { # statusline [command]
   JSON=$(cat 2>/dev/null; printf x); JSON=${JSON%x}   # $(cat) alone would drop the trailing newline
-  [ -z "${TMUX:-}" ] || limits claude >/dev/null 2>&1
+  [ -z "${TMUX:-}" ] || (limits claude >/dev/null 2>&1 &)
   next=${1:-$(opt @agent_signal_statusline_next "")}
   [ -n "$next" ] || return 0
   printf '%s' "$JSON" | sh -c "$next"
@@ -674,45 +689,59 @@ install_claude_hooks() {
   [ -f "$settings" ] || { mkdir -p "$(dirname "$settings")" && printf '{}\n' > "$settings"; }
   # Keep the first backup: it is the only copy of the settings as they were before us.
   [ -f "$settings.bak-agent-signal" ] || cp "$settings" "$settings.bak-agent-signal"
-  tmp=$(mktemp "$settings.XXXXXX") || exit 1
-  trap 'rm -f "$tmp"' EXIT INT TERM
   # The path is double-quoted inside the command because Claude runs hooks
   # through a shell and a plugin directory may contain spaces.
-  jq --arg bin "$SELF" '
+  # shellcheck disable=SC2016  # $ev and $bin are jq's variables
+  settings_edit --arg bin "$SELF" '
     def matcher($ev): if $ev == "SessionStart" then "startup|resume|clear|fork" else "" end;
     def entry($ev): {matcher: matcher($ev), hooks: [{type: "command", command: ("\"" + $bin + "\" hook " + $ev), async: true}]};
     def add($ev): .hooks[$ev] = ((.hooks[$ev] // []) | map(select((.hooks // []) | any(.command | tostring | contains("agent-signal\" hook") or contains("agent-signal hook")) | not)) + [entry($ev)]);
     .hooks //= {} |
     reduce ("SessionStart","UserPromptSubmit","PreToolUse","PostToolUse","PermissionRequest","Notification","Stop","StopFailure","SessionEnd") as $ev (.; add($ev))
-  ' "$settings" > "$tmp" && mv "$tmp" "$settings" && echo "hooks merged into $settings (backup: $settings.bak-agent-signal)"
+  ' && echo "hooks merged into $settings (backup: $settings.bak-agent-signal)"
+}
+
+# Rewrite $settings with a jq filter, through the file itself rather than by
+# moving a new one over it: a settings.json that is a symlink into a dotfiles
+# repo stays one, and its mode stays as it was. Nothing is written if jq fails.
+settings_edit() { # settings_edit <jq arguments>
+  tmp=$(mktemp "${TMPDIR:-/tmp}/agent-signal.XXXXXX") || return 1
+  trap 'rm -f "$tmp"' EXIT INT TERM
+  if jq "$@" "$settings" > "$tmp" && [ -s "$tmp" ]; then cat "$tmp" > "$settings"; rc=$?; else rc=1; fi
+  rm -f "$tmp"; return "$rc"
 }
 
 # Claude has one statusLine, so ours wraps whatever was there: the old command
-# becomes the argument `statusline` chains to, and the original setting is kept
-# beside the settings file for uninstall to put back.
+# becomes the argument `statusline` chains to. What was there and what replaced
+# it are both kept beside the settings file, so uninstall can put the first
+# back and can tell whether the second has been edited since.
 install_claude_statusline() {
-  settings="$HOME/.claude/settings.json"
+  settings="$HOME/.claude/settings.json"; saved="$settings.statusline-agent-signal"
   command -v jq >/dev/null 2>&1 || { echo "jq is required to edit $settings; by hand, set statusLine.command to: \"$SELF\" statusline" >&2; exit 1; }
   [ -f "$settings" ] || { mkdir -p "$(dirname "$settings")" && printf '{}\n' > "$settings"; }
   restore_claude_statusline >/dev/null   # a re-run starts from the original (the plugin may have moved)
-  case $(jq -r '.statusLine.command // ""' "$settings") in *agent-signal*" statusline"*)
-    echo "statusLine in $settings already runs agent-signal statusline" >&2; exit 1 ;; esac
-  jq '.statusLine // null' "$settings" > "$settings.statusline-agent-signal" || exit 1
-  tmp=$(mktemp "$settings.XXXXXX") || exit 1
-  trap 'rm -f "$tmp"' EXIT INT TERM
-  jq --arg bin "$SELF" '(.statusLine.command // null) as $prev
-    | .statusLine = ((.statusLine // {}) + {type: "command", command: ("\"" + $bin + "\" statusline" + (if $prev then " " + ($prev | @sh) else "" end))})
-  ' "$settings" > "$tmp" && mv "$tmp" "$settings" && echo "statusLine set in $settings (original kept in $settings.statusline-agent-signal)"
+  case $(jq -r '.statusLine.command // ""' "$settings" 2>/dev/null) in *agent-signal*" statusline"*)
+    echo "statusLine in $settings already runs agent-signal statusline and is not as the installer left it; nothing changed" >&2; exit 1 ;; esac
+  # Worked out before anything is written: a settings.json that does not parse changes nothing.
+  new=$(jq -c --arg bin "$SELF" '(.statusLine.command // null) as $prev | {original: (.statusLine // null),
+    installed: ((.statusLine // {}) + {type: "command", command: ("\"" + $bin + "\" statusline" + (if $prev then " " + ($prev | @sh) else "" end))})}' "$settings" 2>/dev/null)
+  [ -n "$new" ] || { echo "agent-signal: $settings is not valid JSON; nothing changed" >&2; exit 1; }
+  # shellcheck disable=SC2016  # $s is jq's variable
+  printf '%s\n' "$new" > "$saved" && settings_edit --argjson s "$new" '.statusLine = $s.installed' \
+    && echo "statusLine set in $settings (original kept in $saved)"
 }
 
-restore_claude_statusline() { # put back the statusLine the installer found
+restore_claude_statusline() { # put back the statusLine the installer replaced, unless it has been edited since
   settings="$HOME/.claude/settings.json"; saved="$settings.statusline-agent-signal"
-  { [ -f "$saved" ] && command -v jq >/dev/null 2>&1; } || return 0
+  [ -f "$saved" ] || return 0
+  command -v jq >/dev/null 2>&1 || { echo "agent-signal: jq not found, so statusLine in $settings is left as it is (the original is in $saved)"; return 0; }
   case $(jq -r '.statusLine.command // ""' "$settings" 2>/dev/null) in *agent-signal*" statusline"*) ;; *) return 0 ;; esac
-  tmp=$(mktemp "$settings.XXXXXX") || return 0
-  jq --slurpfile s "$saved" 'if $s[0] == null then del(.statusLine) else .statusLine = $s[0] end' "$settings" > "$tmp" \
-    && mv "$tmp" "$settings" && rm -f "$saved" && echo "agent-signal: statusLine in $settings is back as it was"
-  rm -f "$tmp"
+  if [ "$(jq --slurpfile s "$saved" '.statusLine == $s[0].installed' "$settings" 2>/dev/null)" != true ]; then
+    echo "agent-signal: statusLine in $settings has been edited since it was installed, so it is left as it is (the original is in $saved)"; return 0
+  fi
+  # shellcheck disable=SC2016  # $s is jq's variable
+  settings_edit --slurpfile s "$saved" 'if $s[0].original == null then del(.statusLine) else .statusLine = $s[0].original end' \
+    && rm -f "$saved" && echo "agent-signal: statusLine in $settings is back as it was"
 }
 
 # --- check -----------------------------------------------------------------
@@ -805,7 +834,7 @@ uninstall() {
     t set-option -up -t "$p" @agent_pane_state \; set-option -up -t "$p" @agent_kind \; set-option -up -t "$p" @agent_name
   done
   t set-option -gu @agent_needs; t set-option -gu @agent_signal_command
-  for o in $(t show-options -g | sed -n 's/^\(@agent_limit[a-z0-9_]*\) .*/\1/p'); do t set-option -gu "$o"; done
+  limits_clear
   restore_claude_statusline
   echo "agent-signal: removed formats, hooks, key bindings and window/pane state. Claude hooks in ~/.claude/settings.json are left for you to delete."
 }
@@ -818,8 +847,8 @@ case ${1:-} in
   clear)  set_state clear "${2:-}" ;;
   seen)   seen "${2:-}" ;;
   needs|summary) refresh_needs; refresh_progress ;;
-  limits) limits ;;
-  statusline) statusline "${2:-}" ;;
+  limits) if limits_on; then limits; else limits_clear; fi ;;   # switched off: nothing stays published
+  statusline) shift; statusline "$*" ;;
   progress) case ${2:-} in ""|print|clear) refresh_progress "${2:-}" ;; *) echo "agent-signal progress: print or clear" >&2; exit 1 ;; esac ;;
   badge-format) printf '%s\n' "$BADGE" ;;
   window-format) printf '%s\n' "$WINDOW_FORMAT" ;;

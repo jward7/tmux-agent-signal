@@ -107,8 +107,10 @@ setup_env() {
   trap '_rc=$?; cleanup; exit $_rc' EXIT
   TMPDIR=$(mktemp -d "${TMPDIR:-/tmp}/agent-signal-test.XXXXXX") && export TMPDIR
   # The scripts read ~/.claude and ~/.codex, and uninstall rewrites Claude's
-  # settings.json: keep every test off the real home directory.
-  HOME=$TMPDIR; export HOME
+  # settings.json: keep every test off the real home directory. The tmux
+  # server is still started with the real one (see setup), so the shells in
+  # its panes do not write their history files into a directory about to go.
+  REAL_HOME=$HOME; HOME=$TMPDIR; export HOME
   # The scripts talk to whatever server $TMUX points at, so point it at ours.
   TMUX="$SOCK_PATH,0,0"; export TMUX
 }
@@ -119,7 +121,7 @@ setup_env() {
 setup() {
   setup_env
   T kill-server 2>/dev/null
-  T -f /dev/null new-session -d -s main -n shell -x 120 -y 30
+  env HOME="$REAL_HOME" tmux -L "$SOCK" -f /dev/null new-session -d -s main -n shell -x 120 -y 30
   T set-option -g @agent_signal_sound off          # no afplay in CI
   T set-option -g @agent_signal_tab_colour on
   sh "$ROOT/agent-signal.tmux"

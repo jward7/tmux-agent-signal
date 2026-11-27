@@ -15,7 +15,11 @@ RUNPATH=$PATH           # swapped for $NOJQ to run the same cases without jq
 g()     { T show-option -gqv "$1"; }
 count() { T show-options -g | grep -c '^@agent_limit_'; }
 wipe()  { for o in $(T show-options -g | sed -n 's/^\(@agent_limit[a-z0-9_]*\) .*/\1/p'); do T set-option -gu "$o"; done; }
-sl()    { printf '%s\n' "$1" | PATH=$RUNPATH AGENT_SIGNAL_NOW=$NOW "$AS" statusline; }   # sl <payload>
+# `statusline` records in the background. That job inherits fd 3, so a pipe on
+# fd 3 stays open until it has finished: when cat returns, the options are
+# written. The command's own output and exit status pass through.
+settled() { { "$@" 3>&1; echo $? > "$TMPDIR/rc"; } | cat; return "$(cat "$TMPDIR/rc")"; }
+sl()    { printf '%s\n' "$1" | settled env PATH="$RUNPATH" AGENT_SIGNAL_NOW="${2:-$NOW}" "$AS" statusline; }   # sl <payload> [now]
 put()   { T set-option -g "@agent_limit_$1" "$2"; }                                       # put <agent_window_field> <value>
 recompute() { AGENT_SIGNAL_NOW=$NOW "$AS" limits; g @agent_limits; }
 
@@ -47,7 +51,7 @@ hook "$P_API" UserPromptSubmit
 is "off: nothing is recorded by statusline, a Codex turn end or a Claude hook" "$(count)" 0
 is "off: @agent_limits stays unset"                 "$(T show-options -g | grep -c '^@agent_limits')" 0
 printf '%s\n' "$FULL" > "$TMPDIR/in"
-out=$("$AS" statusline "cat > '$TMPDIR/got'; echo one; echo two; exit 3" < "$TMPDIR/in"); rc=$?
+out=$(settled "$AS" statusline "cat > '$TMPDIR/got'; echo one; echo two; exit 3" < "$TMPDIR/in"); rc=$?
 is "off: the previous status line still runs"       "$rc:$(printf '%s' "$out" | tr '\n' ' ')" "3:one two"
 is "check says the meter is off"                    "$("$AS" check | grep -c 'ok   usage meter switched off')" 1
 
@@ -73,6 +77,15 @@ claude_cases() { # claude_cases <label>
   is "$1: an earlier window does not replace a later one" "$(g @agent_limit_claude_5h_used):$(g @agent_limit_claude_5h_reset)" "23:$R5"
   sl "$(five 5 $((R5 + 18000)))"
   is "$1: a later window replaces it, even with less used" "$(g @agent_limit_claude_5h_used):$(g @agent_limit_claude_5h_reset)" "5:$((R5 + 18000))"
+  # ... but only for ten minutes: after that a lower figure is a real drop.
+  sl "$(five 2 $((R5 + 18000)))" $((NOW + 599))
+  is "$1: 9m59s after the record a lower figure is still refused" "$(g @agent_limit_claude_5h_used)" 5
+  sl "$(five 2 $((R5 + 18000)))" $((NOW + 600))
+  is "$1: after ten minutes a lower figure is taken"  "$(g @agent_limit_claude_5h_used):$(g @agent_limit_claude_at)" "2:$((NOW + 600))"
+
+  # Only the windows under rate_limits count, wherever else the names turn up.
+  wipe; sl "{\"before\":{\"five_hour\":{\"used_percentage\":88,\"resets_at\":$R7}},\"rate_limits\":{\"five_hour\":{\"used_percentage\":12,\"resets_at\":$R5}},\"after\":{\"five_hour\":{\"used_percentage\":99},\"seven_day\":{\"used_percentage\":77}}}"
+  is "$1: a five_hour outside rate_limits is not the window" "$(g @agent_limit_claude_5h_used):$(g @agent_limit_claude_5h_reset)" "12:$R5"
 
   wipe; sl "$WEEKLY"
   is "$1: seven_day alone records only the weekly window" "$(g @agent_limit_claude_7d_used):$(g @agent_limit_claude_5h_used):$(count)" "36::3"
@@ -98,7 +111,7 @@ RUNPATH=$NOJQ; claude_cases "no jq"; RUNPATH=$PATH
 
 # --- chaining to the previous status line ------------------------------------
 wipe
-out=$("$AS" statusline "cat > '$TMPDIR/got'; echo one; echo two; exit 3" < "$TMPDIR/in"); rc=$?
+out=$(settled env AGENT_SIGNAL_NOW="$NOW" "$AS" statusline "cat > '$TMPDIR/got'; echo one; echo two; exit 3" < "$TMPDIR/in"); rc=$?
 is "chain: the previous command gets the identical stdin" "$(cmp -s "$TMPDIR/in" "$TMPDIR/got" && echo same)" same
 is "chain: its output is printed"                   "$(printf '%s' "$out" | tr '\n' ' ')" "one two"
 is "chain: its exit status is kept"                 "$rc" 3
@@ -106,6 +119,7 @@ is "chain: and the limits were still recorded"      "$(g @agent_limit_claude_5h_
 T set-option -g @agent_signal_statusline_next 'echo from-option'
 is "chain: @agent_signal_statusline_next names the command" "$("$AS" statusline < "$TMPDIR/in")" from-option
 is "chain: an argument wins over the option"        "$("$AS" statusline 'echo from-arg' < "$TMPDIR/in")" from-arg
+is "chain: a command written as several words is run whole" "$("$AS" statusline echo several   words < "$TMPDIR/in")" "several words"
 T set-option -gu @agent_signal_statusline_next
 is "chain: outside tmux the previous command still runs" "$(TMUX='' "$AS" statusline 'cat' < "$TMPDIR/in")" "$FULL"
 
@@ -124,16 +138,33 @@ codex_cases() { # codex_cases <label>
   is "$1: weekly-only data lands in 7d, whatever its position" "$(g @agent_limit_codex_7d_used):$(g @agent_limit_codex_5h_used)" "44:"
   wipe; { tc "$(rl "$(cw 61 10080 "$R7")" "$(cw 7 300 "$R5")")"; } | rollout a; codex_done
   is "$1: windows are mapped by window_minutes, not position" "$(g @agent_limit_codex_5h_used):$(g @agent_limit_codex_7d_used)" "7:61"
+  wipe; { tc "$(rl "$(cw 21 299 "$R5")" "$(cw 62 10079 "$R7")")"; } | rollout a; codex_done
+  is "$1: lengths a minute short are the same windows" "$(g @agent_limit_codex_5h_used):$(g @agent_limit_codex_7d_used)" "21:62"
+  wipe; { tc "$(rl "$(cw 50 290 "$R5")" "$(cw 50 10100 "$R7")")"; } | rollout a; codex_done
+  is "$1: lengths well off are not"                  "$(count)" 0
   wipe; { tc "$(rl "$(cw 50 43200 "$R7")" null)"; } | rollout a; codex_done
   is "$1: a monthly window is not recorded"          "$(count)" 0
   wipe; { tc "$(rl '{"used_percent":20,"window_minutes":300,"resets_in_seconds":600}' '{"used_percent":3.0,"window_minutes":10080}')"; } | rollout a; codex_done
   is "$1: resets_in_seconds counts from now"         "$(g @agent_limit_codex_5h_reset)" "$((NOW + 600))"
   is "$1: with neither reset field no reset is stored" "$(g @agent_limit_codex_7d_used):$(T show-options -g | grep -c '^@agent_limit_codex_7d_reset')" "3:0"
 
+  # A record with no reset belongs to the stored window while that has not reset.
+  wipe; { tc "$(rl "$(cw 50 300 "$R5")" null)"; } | rollout a; codex_done
+  { tc "$(rl '{"used_percent":10,"window_minutes":300}' null)"; } | rollout a; codex_done
+  is "$1: a report with no reset does not undo the stored window" "$(g @agent_limit_codex_5h_used):$(g @agent_limit_codex_5h_reset)" "50:$R5"
+  { tc "$(rl '{"used_percent":55,"window_minutes":300}' null)"; } | rollout a; codex_done
+  is "$1: and a higher one keeps the stored reset"   "$(g @agent_limit_codex_5h_used):$(g @agent_limit_codex_5h_reset)" "55:$R5"
+
   # Two logs: the one written last is read, the older one never.
   wipe; { tc "$(rl "$(cw 90 300 $((R5 + 999)))" null)"; } | rollout old; sleep 1.1
   { tc "$(rl "$(cw 33 300 "$R5")" null)"; } > "$DAY/rollout-2026-11-26T02-00-00-0199a0b1-new.jsonl"; codex_done
   is "$1: the newest rollout file is the one read"   "$(g @agent_limit_codex_5h_used)" 33
+
+  # A sessions directory that is a symlink (kept on another disk, say).
+  wipe; { tc "$(rl "$(cw 17 300 "$R5")" null)"; } | rollout a
+  mv "$CX/sessions" "$TMPDIR/elsewhere"; ln -s "$TMPDIR/elsewhere" "$CX/sessions"; codex_done
+  is "$1: a symlinked sessions directory is followed" "$(g @agent_limit_codex_5h_used)" 17
+  rm -rf "$TMPDIR/elsewhere"
 
   wipe; { other; other; } | rollout a; codex_done
   is "$1: a log with no rate_limits records nothing" "$(count)" 0
@@ -193,6 +224,21 @@ is "with every window past its reset the option is unset" "$(recompute):$(T show
 T set-option -gu @agent_limit_codex_5h_reset
 is "a window with no reset is shown, without a pace" "$(recompute)" "X 40%"
 
+# --- switching it off again --------------------------------------------------
+T set-option -g @agent_signal_limits off
+hook "$P_API" UserPromptSubmit
+is "off again: an agent event leaves the options as they are" "$(g @agent_limits)" "X 40%"
+"$AS" limits
+is "off again: \`limits\` takes the meter and its data away" "$(T show-options -g | grep -c '^@agent_limit')" 0
+put codex_at "$NOW"; put codex_5h_used 60; T set-option -g @agent_limits "X 40%"
+sh "$ROOT/agent-signal.tmux"
+is "off again: so does loading the plugin"           "$(T show-options -g | grep -c '^@agent_limit')" 0
+T set-option -g @agent_signal_limits on
+put codex_at "$NOW"; put codex_5h_used 60
+sh "$ROOT/agent-signal.tmux"
+is "on: loading the plugin leaves the data alone"    "$(g @agent_limit_codex_5h_used)" 60
+recompute >/dev/null
+
 # --- check -------------------------------------------------------------------
 out=$("$AS" check); rc=$?
 is "check exits 0 with the meter on"                 "$rc" 0
@@ -210,13 +256,27 @@ is "install exits 0 and says what it did"            "$rc:$(printf '%s\n' "$out"
 is "install points statusLine at the quoted script"  "$(jq -r '.statusLine.command' "$S" | cut -c1-$((${#AS} + 13)))" "\"$AS\" statusline"
 is "install keeps the other statusLine fields"       "$(jq -c '[.statusLine.type, .statusLine.padding]' "$S")" '["command",2]'
 is "install keeps unrelated settings"                "$(jq -c '[.model, .hooks]' "$S")" '["x",{}]'
-is "the installed command still runs the user's status line" "$(sh -c "$(jq -r '.statusLine.command' "$S")" < "$TMPDIR/in")" "it's mine"
+is "the installed command still runs the user's status line" "$(settled env AGENT_SIGNAL_NOW="$NOW" sh -c "$(jq -r '.statusLine.command' "$S")" < "$TMPDIR/in")" "it's mine"
 is "and records the limits on the way"               "$(g @agent_limit_claude_5h_used)" 23
 is "check sees the statusLine wired"                 "$("$AS" check | grep -c 'ok   Claude Code statusLine runs agent-signal statusline')" 1
 first=$(jq -c '.statusLine' "$S")
 "$AS" install-claude-statusline >/dev/null
 is "re-running install changes nothing"              "$(jq -c '.statusLine' "$S")" "$first"
-is "and the original is still the one kept"          "$(jq -c . "$S.statusline-agent-signal")" "$ORIG"
+is "and the original is still the one kept"          "$(jq -c .original "$S.statusline-agent-signal")" "$ORIG"
+
+# A settings.json that stops parsing must not cost the kept original.
+cp "$S" "$TMPDIR/good"; printf '{"statusLine": {,}\n' > "$S"
+err=$("$AS" install-claude-statusline 2>&1 >/dev/null); rc=$?
+is "install on a broken settings.json exits 1 and says so" "$rc:$(printf '%s\n' "$err" | grep -c 'not valid JSON')" "1:1"
+is "and the kept original is untouched"              "$(jq -c .original "$S.statusline-agent-signal")" "$ORIG"
+cp "$TMPDIR/good" "$S"
+
+# settings.json as a symlink into a dotfiles repo, with its own mode.
+mkdir -p "$TMPDIR/dotfiles"; mv "$S" "$TMPDIR/dotfiles/settings.json"; ln -s "$TMPDIR/dotfiles/settings.json" "$S"; chmod 644 "$TMPDIR/dotfiles/settings.json"
+"$AS" uninstall >/dev/null; "$AS" install-claude-statusline >/dev/null
+is "install and uninstall write through a symlinked settings.json" "$([ -L "$S" ] && echo link):$(jq -r '.statusLine.command' "$TMPDIR/dotfiles/settings.json" | grep -c statusline)" "link:1"
+is "and leave its mode alone"                        "$(find "$TMPDIR/dotfiles/settings.json" -perm 644 | wc -l | tr -d ' ')" 1
+rm "$S"; mv "$TMPDIR/dotfiles/settings.json" "$S"
 is "install leaves no temp files"                    "$(find "$HOME/.claude" -name 'settings.json.??????' | wc -l | tr -d ' ')" 0
 "$AS" uninstall >/dev/null
 is "uninstall restores the original statusLine exactly" "$(jq -c '.statusLine' "$S")" "$ORIG"
@@ -232,6 +292,21 @@ printf '{"model":"x"}\n' > "$S"
 is "with no statusLine, install adds a bare one"     "$(jq -c '.statusLine' "$S")" "{\"type\":\"command\",\"command\":\"\\\"$AS\\\" statusline\"}"
 "$AS" uninstall >/dev/null
 is "and uninstall removes it again"                  "$(jq -c . "$S")" '{"model":"x"}'
+# A wrapper the user has edited since is theirs too: neither command undoes it.
+printf '{"model":"x","statusLine":%s}\n' "$ORIG" > "$S"
+"$AS" install-claude-statusline >/dev/null
+jq --arg c "\"$AS\" statusline 'echo edited'" '.statusLine.command = $c | .statusLine.padding = 0' "$S" > "$S.new" && mv "$S.new" "$S"
+edited=$(jq -c '.statusLine' "$S")
+out=$("$AS" uninstall)
+is "uninstall leaves an edited wrapper alone"        "$(jq -c '.statusLine' "$S")" "$edited"
+is "and says so, pointing at the kept original"      "$(printf '%s\n' "$out" | grep -c 'edited since it was installed')" 1
+err=$("$AS" install-claude-statusline 2>&1 >/dev/null); rc=$?
+is "install refuses to rewrap an edited wrapper"     "$rc:$(jq -c '.statusLine' "$S"):$(printf '%s\n' "$err" | grep -c 'nothing changed')" "1:$edited:1"
+is "the original is still kept for the user"         "$(jq -c .original "$S.statusline-agent-signal")" "$ORIG"
+out=$(PATH=$NOJQ "$AS" uninstall)
+is "uninstall without jq says the statusLine is left" "$(printf '%s\n' "$out" | grep -c 'jq not found, so statusLine')" 1
+rm -f "$S.statusline-agent-signal"; printf '{"model":"x"}\n' > "$S"
+
 # A statusLine the user has since replaced is theirs: uninstall keeps it.
 "$AS" install-claude-statusline >/dev/null
 jq '.statusLine.command = "echo newer"' "$S" > "$S.new" && mv "$S.new" "$S"

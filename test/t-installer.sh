@@ -20,6 +20,15 @@ is "re-running keeps the original backup"        "$(cmp -s "$FIX/first-backup" "
 is "installer leaves no temp files"              "$(find "$FIX/.claude" -name 'settings.json.??????' | wc -l | tr -d ' ')" 0
 rm -rf "$FIX"
 
+# A settings.json that is a symlink (a dotfiles repo) stays one, mode and all.
+FIX=$(mktemp -d); mkdir -p "$FIX/.claude" "$FIX/dotfiles"
+printf '{"model":"x"}\n' > "$FIX/dotfiles/settings.json"; chmod 644 "$FIX/dotfiles/settings.json"
+ln -s "$FIX/dotfiles/settings.json" "$FIX/.claude/settings.json"
+HOME=$FIX "$AS" install-claude-hooks >/dev/null
+is "installer writes through a symlinked settings.json" "$([ -L "$FIX/.claude/settings.json" ] && echo link):$(jq '.hooks | keys | length' "$FIX/dotfiles/settings.json")" "link:9"
+is "installer leaves the file's mode alone"       "$(find "$FIX/dotfiles/settings.json" -perm 644 | wc -l | tr -d ' ')" 1
+rm -rf "$FIX"
+
 # No settings.json at all (nor ~/.claude): the installer starts one.
 FIX=$(mktemp -d)
 HOME=$FIX "$AS" install-claude-hooks >/dev/null; rc=$?

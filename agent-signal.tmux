@@ -50,6 +50,9 @@ cur=$(t show-option -gqv status-right)
 case $cur in "#{@agent_summary}"*) t set-option -g status-right "${cur#"#{@agent_summary}"}" ;; esac
 t set-option -gu @agent_summary
 
+# --- usage meter: switched off, nothing of it stays published ------------------
+[ "$(opt @agent_signal_limits off)" = on ] || "$AS" limits
+
 # --- outer terminal title: "[2 need you] session:window" ---------------------
 if [ "$(opt @agent_signal_title off)" = on ]; then
   # Remember what was there (once) so uninstall can put it back.

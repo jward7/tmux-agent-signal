@@ -55,9 +55,9 @@ already write locally. The plugin makes no network call and reads no
 credential.
 
 ```
-Claude statusLine ──> agent-signal statusline ──> @agent_limit_claude_<5h|7d>_used/_reset, _at
-                                               └─> rebuild @agent_limits
-                                               └─> your previous statusLine command (same stdin)
+Claude statusLine ──> agent-signal statusline ──> your previous statusLine command (same stdin)
+                                               └─> in the background: @agent_limit_claude_<5h|7d>_used/_reset, _at
+                                                   then rebuild @agent_limits
 Codex Stop hook ──> agent-signal set done ──> tail of the newest rollout log ──> @agent_limit_codex_...
 any agent event ──> rebuild @agent_limits
 status-right: #{@agent_limits}, read natively
@@ -69,7 +69,9 @@ assistant message. For Pro, Max and Ultra plans it carries
 `used_percentage` (0 to 100) and `resets_at` (epoch seconds). The object is
 absent until the session's first API response, either window can be
 missing, and Claude drops a window once its reset passes. A payload records
-the windows it has and leaves the others as they were.
+the windows it has and leaves the others as they were. Only windows under
+`rate_limits` count. Recording runs in the background, so your own status
+line command starts at once and never waits for it.
 
 **Codex** writes each session to
 `${CODEX_HOME:-~/.codex}/sessions/YYYY/MM/DD/rollout-*.jsonl`. Its
@@ -77,15 +79,22 @@ the windows it has and leaves the others as they were.
 with `used_percent`, `window_minutes` and `resets_at`. When a Codex turn
 ends (`set done` with `AGENT_KIND=codex`) the plugin reads the last such
 record in the last 100 lines of the most recently written log. Windows are
-told apart by `window_minutes` (300 is the 5-hour one, 10080 the weekly),
-not by position, and any other length is ignored. An older Codex wrote
-`resets_in_seconds` instead, which is counted from the moment it is read.
-With neither field no reset is stored, and that window has no pace.
+told apart by `window_minutes` (300 is the 5-hour one, 10080 the weekly,
+give or take a few minutes of rounding), not by position, and any other
+length is ignored. An older Codex wrote `resets_in_seconds` instead, which
+is counted from the moment it is read. A record with neither field keeps
+the reset already stored while that is still to come; otherwise no reset is
+stored, and that window has no pace.
 
 Every session reports what it last saw, so an idle one can be behind the
-others. A record is ignored when its window resets earlier than the one
-already stored, or when it is the same window with less used: within one
-window usage only grows.
+others. For ten minutes after a record is stored, a report is ignored when
+its window resets earlier, or when it is the same window with less used:
+within one window usage only grows. After ten minutes anything is taken, so
+a real drop (the provider resets usage, a plan changes) shows on the next
+report, and a stale figure that slips through is corrected by the next
+report from a session that is working. Each record is written in a single
+tmux command, so two sessions reporting at once cannot leave one window's
+usage beside another's reset.
 
 **No polling.** `@agent_limits` is rebuilt when a window is recorded and on
 every agent event the plugin already handles, in one `show-options` call and
