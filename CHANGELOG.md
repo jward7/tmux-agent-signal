@@ -1,6 +1,11 @@
 # Changelog
 
-## Unreleased
+## 0.5.0 (2026-11-27)
+
+One look instead of a theme to configure, pane borders and a terminal
+progress bar that follow the agent's state, and an opt-in usage meter. The
+per-state style options and the status-right summary are gone (see below).
+The suite grew from 401 to 586 checks across 30 files.
 
 - **Usage meter (opt-in).** `@agent_signal_limits on` records how much of the
   Claude Code and Codex subscription allowance is used, per 5-hour and weekly
@@ -14,10 +19,15 @@
   a turn ends. No network, no credentials, no timer: the meter moves on
   agent events. `@agent_signal_limits_show remaining|used`,
   `agent-signal limits`, and the raw `@agent_limit_*` options. Off by
-  default, and with it off nothing is recorded or published.
+  default, and with it off nothing is recorded or published. Claude's side
+  is checked against a real payload; the Codex side is written from Codex's
+  source and has not yet been run against a real session log.
 - `install-claude-hooks` writes through `~/.claude/settings.json` instead of
   moving a new file over it: a settings file that is a symlink into a
   dotfiles repo stays one, and its mode is kept.
+
+- The demo (`docs/demo.sh`) and the README recording show the usage meter,
+  and the recording now ends on the status bar instead of a blank frame.
 
 - **Terminal progress bar.** On iTerm2 3.6+, WezTerm and Ghostty the bar at
   the top of the terminal tab follows the window on screen: moving while its

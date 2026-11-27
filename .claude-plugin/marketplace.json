@@ -5,7 +5,7 @@
     {
       "name": "tmux-agent-signal",
       "source": "./",
-      "version": "0.4.2",
+      "version": "0.5.0",
       "description": "Show this session's state (working, blocked, asking, done) in the tmux window list."
     }
   ]

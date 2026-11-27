@@ -1,6 +1,6 @@
 {
   "name": "tmux-agent-signal",
-  "version": "0.4.2",
+  "version": "0.5.0",
   "description": "Know which agent needs you, from the tmux status bar: working, blocked, asking, done as a badge and tab colour per window, with a key to jump to the next one. Optional usage meter: how much of the Claude Code and Codex allowance is left.",
   "author": { "name": "Justin Ward" },
   "repository": "https://github.com/jward7/tmux-agent-signal",
