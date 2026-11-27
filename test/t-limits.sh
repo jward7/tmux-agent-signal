@@ -117,11 +117,44 @@ is "chain: its output is printed"                   "$(printf '%s' "$out" | tr '
 is "chain: its exit status is kept"                 "$rc" 3
 is "chain: and the limits were still recorded"      "$(g @agent_limit_claude_5h_used)" 23
 T set-option -g @agent_signal_statusline_next 'echo from-option'
-is "chain: @agent_signal_statusline_next names the command" "$("$AS" statusline < "$TMPDIR/in")" from-option
-is "chain: an argument wins over the option"        "$("$AS" statusline 'echo from-arg' < "$TMPDIR/in")" from-arg
-is "chain: a command written as several words is run whole" "$("$AS" statusline echo several   words < "$TMPDIR/in")" "several words"
+is "chain: @agent_signal_statusline_next names the command" "$(settled "$AS" statusline < "$TMPDIR/in")" from-option
+is "chain: an argument wins over the option"        "$(settled "$AS" statusline 'echo from-arg' < "$TMPDIR/in")" from-arg
+is "chain: a command written as several words is run whole" "$(settled "$AS" statusline echo several   words < "$TMPDIR/in")" "several words"
 T set-option -gu @agent_signal_statusline_next
 is "chain: outside tmux the previous command still runs" "$(TMUX='' "$AS" statusline 'cat' < "$TMPDIR/in")" "$FULL"
+
+# --- recording never holds the status line up --------------------------------
+# A tmux that does not answer until the gate file appears. If statusline
+# waited for the recording, it would come back with the options already
+# written (after the five seconds the stand-in gives up at).
+wipe; SLOW=$(mktemp -d); GATE="$TMPDIR/gate"
+# shellcheck disable=SC2016  # $i and $@ belong to the stand-in script
+printf '#!/bin/sh\ni=0; while [ ! -e "%s" ] && [ $i -lt 100 ]; do sleep 0.05; i=$((i + 1)); done\nexec "%s" "$@"\n' "$GATE" "$(command -v tmux)" > "$SLOW/tmux"; chmod +x "$SLOW/tmux"
+out=$(PATH=$SLOW:$PATH AGENT_SIGNAL_NOW=$NOW "$AS" statusline 'cat >/dev/null; echo drawn' < "$TMPDIR/in")
+is "the status line is drawn while the recording is still waiting" "$out:$(count)" "drawn:0"
+: > "$GATE"; i=0; while [ -z "$(g @agent_limits)" ] && [ $i -lt 100 ]; do sleep 0.05; i=$((i + 1)); done
+is "and the recording lands once tmux answers"      "$(g @agent_limit_claude_5h_used):$(g @agent_limits)" "23:C 77% w59%"
+rm -rf "$SLOW" "$GATE"
+
+# --- two sessions reporting at once ------------------------------------------
+# A fresh session and a stale one race. Whichever lands last, each window's
+# used and reset must come from the same report, never one from each.
+LATE5=$((R5 + 18000)); LATE7=$((R7 + 604800))
+FRESH=$(payload "\"rate_limits\":{\"five_hour\":{\"used_percentage\":5,\"resets_at\":$LATE5},\"seven_day\":{\"used_percentage\":10,\"resets_at\":$LATE7}}")
+STALE=$(payload "\"rate_limits\":{\"five_hour\":{\"used_percentage\":95,\"resets_at\":$R5},\"seven_day\":{\"used_percentage\":90,\"resets_at\":$R7}}")
+race() { printf '%s\n' "$1" | AGENT_SIGNAL_NOW=$NOW "$AS" statusline 3>&1 | cat; }   # returns once the recording has finished
+i=0; mixed=""
+while [ $i -lt 10 ]; do
+  wipe; race "$FRESH" & race "$STALE" & wait
+  for w in 5h 7d; do
+    pair="$(g "@agent_limit_claude_${w}_used"):$(g "@agent_limit_claude_${w}_reset")"
+    case $pair in "5:$LATE5"|"95:$R5"|"10:$LATE7"|"90:$R7") ;; *) mixed="$mixed $w=$pair" ;; esac
+  done
+  i=$((i + 1))
+done
+is "ten races: used and reset always come from the same report" "$mixed" ""
+sl "$FRESH"
+is "and the next fresh report is the one that stands" "$(g @agent_limit_claude_5h_used):$(g @agent_limit_claude_5h_reset):$(g @agent_limit_claude_7d_used)" "5:$LATE5:10"
 
 # --- Codex rollout logs ------------------------------------------------------
 codex_cases() { # codex_cases <label>
