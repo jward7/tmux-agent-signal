@@ -513,10 +513,13 @@ limits() { # limits [claude|codex]: record that agent's windows, then rebuild @a
 # printed and the exit status. Without one, nothing is printed.
 statusline() { # statusline [command]
   JSON=$(cat 2>/dev/null; printf x); JSON=${JSON%x}   # $(cat) alone would drop the trailing newline
-  [ -z "${TMUX:-}" ] || (limits claude >/dev/null 2>&1 &)
+  # exec, not a redirection on the call: dash keeps a copy of the old stdout
+  # for the length of a redirected function call, and Claude would wait on it.
+  [ -z "${TMUX:-}" ] || (exec >/dev/null 2>&1; limits claude &)
   next=${1:-$(opt @agent_signal_statusline_next "")}
   [ -n "$next" ] || return 0
-  printf '%s' "$JSON" | sh -c "$next"
+  # (A command that reads no stdin closes the pipe on us; that is not an error.)
+  printf '%s' "$JSON" 2>/dev/null | sh -c "$next"
 }
 
 # A hook can fire before tmux has sourced the entry file (plugin installed,
