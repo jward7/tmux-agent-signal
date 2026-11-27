@@ -1,7 +1,9 @@
 # How it compares
 
 All of these are good projects under active development, so this is a
-snapshot as of **2026-09-07**, agent rows re-checked **2026-10-25**.
+snapshot as of **2026-09-07**, agent rows re-checked **2026-10-25**; the
+usage-meter row was checked against each project's README on **2026-11-27**,
+and none of them mentions one.
 [workmux](https://github.com/raine/workmux) is left out because it is a
 worktree manager with a status layer, not a status plugin, but several of
 this plugin's integrations were corrected against its. tmux-agent-state is the closest relative:
@@ -23,6 +25,7 @@ summary layers. 🟢 has it, 🟡 partial or optional, 🔴 does not,
 | Wait / park triage | 🟢 | 🔴 | 🟢 | 🔴 | 🔴 | 🔴 |
 | Switcher with close actions | 🟢 fzf popup | 🔴 | 🟢 sidebar + popup | 🔴 | 🔴 | 🟢 |
 | Fleet summary in status bar | 🟡 coloured tabs, needs-you count | 🔴 | 🟢 | 🔴 | 🟡 badges only | 🟢 |
+| Subscription usage meter (5-hour and weekly allowance left) | 🟡 opt-in; Claude Code and Codex | 🔴 | 🔴 | 🔴 | 🔴 | 🔴 |
 | Sounds | 🟢 | 🟡 bell; bring your own notifier | 🟢 | 🟢 | 🟢 | 🟢 |
 | Background task awareness | 🟢 | 🔴 | 🟢 | 🔴 | 🔴 | ▫️ |
 | Claude Code | 🟢 plugin or hooks | 🟢 plugin install | 🟢 | 🟢 | 🟢 | 🟢 |

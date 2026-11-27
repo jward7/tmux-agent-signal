@@ -69,7 +69,23 @@ set -g status-right '#{@agent_limits} %H:%M'
 Claude Code reports through its status line, so point that at the plugin
 once (`agent-signal install-claude-statusline`, which keeps the status line
 you had). Codex needs nothing beyond its [hooks](../integrations/codex/):
-its session log is read as each turn ends.
+its session log is read as each turn ends. `agent-signal check` then says
+whether the meter is on, what it reads, and whether Claude's status line
+is wired.
+
+Claude Code sends the numbers on Pro, Max and Ultra subscriptions, and only
+after a session's first reply. A plan may report one
+window and not the other: with only a weekly window the meter reads
+`C w61%`.
+
+In a status line that already has content, let the meter take no room when
+it has nothing to show, and make sure `status-right-length` has space for
+it (about 20 columns for two agents with both windows):
+
+```tmux
+set -g status-right '#{?@agent_limits,#{@agent_limits}  ,}%a %H:%M'
+set -g status-right-length 60
+```
 
 `@agent_limits` reads `C 62% X 40%`: Claude has 62% of its 5-hour window
 left, Codex 40%. The weekly figure joins as `w30%` when it has less left

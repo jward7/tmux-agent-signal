@@ -30,6 +30,13 @@ broken indicator can never block an agent.
 | [Grok CLI](grok/) | hooks file | yes | yes | | yes | from workmux's hooks, not exercised here |
 | [Antigravity CLI](antigravity/) | hooks in `~/.gemini/config/hooks.json` | yes | | | yes | from workmux's hooks, not exercised here |
 
+The opt-in [usage meter](../docs/configuration.md#usage-meter) has two
+sources so far. Claude Code hands its rate-limit windows to its status line
+command (`agent-signal install-claude-statusline`); that path is checked
+against a real payload. Codex writes them to its session log, which the
+`Stop` hook reads; that path is from Codex's source, not exercised here.
+The other agents report no allowance the plugin can read locally.
+
 "From the docs" means the mapping was written against the vendor's published
 hook or plugin reference (and, where the table says so, workmux's shipped
 hooks), in September and October 2026, by someone who does not run that

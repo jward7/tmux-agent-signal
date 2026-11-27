@@ -7,7 +7,7 @@
 
 **Know which agent needs you, from the tmux status bar.**
 
-[Install](#install) · [Keys](#keys) · [Configuration](docs/configuration.md) · [Commands](docs/commands.md) · [Comparison](docs/comparison.md) · [Changelog](CHANGELOG.md)
+[Install](#install) · [Keys](#keys) · [Usage meter](#usage-meter) · [Configuration](docs/configuration.md) · [Commands](docs/commands.md) · [Comparison](docs/comparison.md) · [Changelog](CHANGELOG.md)
 
 [![CI](https://github.com/jward7/tmux-agent-signal/actions/workflows/ci.yml/badge.svg)](https://github.com/jward7/tmux-agent-signal/actions/workflows/ci.yml)
 ![POSIX sh](https://img.shields.io/badge/POSIX_sh-~1000_lines-4cc24c)
@@ -53,7 +53,7 @@ that pane. Nothing else on the bar is the plugin's.
   on` publishes how much of the Claude Code and Codex 5-hour and weekly
   allowance is left as `@agent_limits`, for your own `status-right`, coloured
   only when you are burning it faster than the window allows. Still no
-  polling and no network: see [Configuration](docs/configuration.md#usage-meter).
+  polling and no network: see [Usage meter](#usage-meter).
 - **Small and tested.** About 1000 lines of POSIX `sh`, and a test suite that
   starts a real tmux server, pipes real hook JSON through the real script and
   asserts on the options. CI runs it on macOS and Ubuntu.
@@ -100,6 +100,58 @@ and focusing that tab clears it (needs `focus-events on`; a terminal that
 never reports focus counts as always focused). blocked and ask always show
 through a wait or park.
 </details>
+
+## Usage meter
+
+Optional, and off until you switch it on. Several agents working at once
+can run a subscription allowance down faster than you notice, so the plugin
+can also show how much of it is left, wherever you put it in your own
+status line:
+
+```
+ !1:api  ✓2:web  ~3:docs                              C 62% w30% X 40%  14:05
+```
+
+`C` is Claude Code and `X` is Codex. Each figure is what is left of the
+5-hour window, and `w30%` is the weekly window, shown when it is the
+tighter of the two or the only one your plan reports. Like the tabs, it is
+coloured only when it matters:
+
+| Looks  | Means                                                                 |
+|--------|-----------------------------------------------------------------------|
+| plain  | on pace for the window                                                |
+| orange | over pace (spending faster than the window allows), or 90% used       |
+| red    | 100% used                                                             |
+| dim    | that agent has not reported for six hours                             |
+
+Switch it on in `tmux.conf`, before the plugin loads:
+
+```tmux
+set -g @agent_signal_limits on
+set -g status-right '#{@agent_limits} %H:%M'   # or anywhere in a status line you already have
+```
+
+then, for Claude Code, once:
+
+```sh
+agent-signal install-claude-statusline   # keeps the status line you have; `uninstall` puts it back
+```
+
+- **Still no daemon, no polling, no network, no credentials.** Claude Code
+  already hands its rate-limit windows to its status line command, and
+  Codex already writes them to its session log. The plugin reads those and
+  nothing else, so the meter moves when an agent reports and stays put in
+  between.
+- **Claude Code** sends the numbers on Pro, Max and Ultra subscriptions,
+  after a session's first reply. The installer wraps the status line you
+  already have: yours is still what is drawn.
+- **Codex** needs nothing beyond its [hooks](integrations/codex/). This side
+  was written from Codex's source and has not been run against a real
+  session log yet, so a report either way is welcome.
+
+Show what has been used instead of what is left, change how far behind pace
+turns it orange, or build your own format from the raw numbers: see
+[Configuration](docs/configuration.md#usage-meter).
 
 ## Keys
 
@@ -205,13 +257,15 @@ set -g @agent_signal_tab_colour needs   # colour tabs only for blocked and ask
 set -g @agent_signal_sound off
 set -g @agent_signal_notify on          # desktop banner via terminal-notifier / notify-send
 set -g @agent_signal_title on           # "[2 need you]" in the terminal title
+set -g @agent_signal_limits on          # usage meter: #{@agent_limits} for your status-right
 set -g @agent_signal_key_next ''        # unbind a key
 ```
 
 The full list, including sounds and a hook for running your own command on
 every state change, is in [docs/configuration.md](docs/configuration.md).
 The needs-you count is published as `@agent_needs` for your own
-`status-left` or title format.
+`status-left` or title format, and the [usage meter](#usage-meter) as
+`@agent_limits`.
 
 ## More
 
@@ -223,7 +277,7 @@ The needs-you count is published as `@agent_needs` for your own
   tmux-agent-state, the two tmux-agent-status projects, gentle-agent-state and
   herdr.
 - [How it works](docs/how-it-works.md): the option names, the lock, the
-  seen hook.
+  seen hook, and where the usage meter's numbers come from.
 - [Troubleshooting](docs/troubleshooting.md)
 
 ## Development

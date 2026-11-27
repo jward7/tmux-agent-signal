@@ -24,5 +24,26 @@
   That tmux only notices a pane has died on its next child exit, so the count
   drops on the next hook or `agent-signal needs`. tmux 3.5 and later fixed
   this.
+- **The usage meter shows nothing.** `agent-signal check` says whether it is
+  on, what it currently reads, and whether Claude's status line runs the
+  plugin. It needs all three of `@agent_signal_limits on`, `#{@agent_limits}`
+  somewhere in your status line, and, for Claude Code,
+  `agent-signal install-claude-statusline`. Then it needs a report: Claude
+  sends its numbers only on Pro, Max and Ultra subscriptions and only after
+  a session's first reply, and Codex's are read when a turn ends. If the
+  text is cut off, raise `status-right-length`.
+- **The usage meter shows only a weekly figure** (`C w61%`). That is all the
+  agent reported. Some plans have no 5-hour window, and a window whose
+  reset time has passed is dropped until the agent reports the new one.
+- **The usage meter looks out of date.** Nothing runs on a timer: it moves
+  when an agent reports or an agent event fires. With every agent idle it
+  keeps its last value, dimmed after six hours. `agent-signal limits`
+  recomputes it now.
+- **Claude's own status line changed after `install-claude-statusline`.** It
+  should not have: your command is still run with the same input, through
+  `sh -c`, so an inline command that relied on bash-only syntax needs to
+  move into a script. `agent-signal uninstall` puts the original setting
+  back, unless you have edited `statusLine` since; the original is kept in
+  `~/.claude/settings.json.statusline-agent-signal` either way.
 - **`next` says nothing needs you** while a tab is orange or pink: the
   window is on `wait` or `park`. `prefix + W` / `prefix + P` clears it.
