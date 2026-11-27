@@ -1,6 +1,9 @@
 # Changelog
 
-## Unreleased
+## 0.5.1 (2026-11-27)
+
+A flickering status bar with several agents at work, and fixes to the usage
+meter and its installer from a review of 0.5.0.
 
 - **No more repainting for nothing.** tmux repaints every attached client on
   every option write, even when the value written is the one already there,
