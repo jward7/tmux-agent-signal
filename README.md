@@ -112,6 +112,10 @@ status line:
  !1:api  ✓2:web  ~3:docs                              C 62% w30% X 40%  14:05
 ```
 
+The recording at the top of this page has it between the CI status and the
+battery: Claude's figure ticks down as its agents work and turns orange
+when it falls behind pace.
+
 `C` is Claude Code and `X` is Codex. Each figure is what is left of the
 5-hour window, and `w30%` is the weekly window, shown when it is the
 tighter of the two or the only one your plan reports. Like the tabs, it is

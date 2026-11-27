@@ -23,9 +23,12 @@ D set -g window-status-style 'fg=#808080,bg=default'
 D set -g window-status-current-style 'fg=#e0e0e0,bold,bg=default'
 D set -g status-justify centre
 D set -g status-right-length 90
-D set -g status-right "#{?client_prefix,#[reverse]<Prefix>#[noreverse], } #[fg=green]✓ CI main  [86%%] ↯#[default]  Mon, Sep 07 - 10:42 am "
+# The usage meter is a segment like any other: #{@agent_limits}, placed here
+# between the CI status and the battery.
+D set -g status-right "#{?client_prefix,#[reverse]<Prefix>#[noreverse], } #[fg=green]✓ CI main#[default]  #{?@agent_limits,#{@agent_limits}  ,}#[fg=green][86%%] ↯#[default]  Mon, Sep 07 - 10:42 am "
 D set -g status-left "[work] "
 D set -g @agent_signal_sound off
+D set -g @agent_signal_limits on
 
 # The plugin scripts exit early unless $TMUX is set, and use it to find the
 # server, so fabricate the value tmux would export inside a pane of this one.
@@ -42,6 +45,18 @@ put web   web/checkout claude blocked
 put docs  docs         claude done
 put infra infra/tf     codex  ask
 put data  data/etl     claude working
+
+# Made-up allowances for the usage meter, as the agents would have reported
+# them: Claude with 62% of its 5-hour window left and 3h24m to go (a little
+# behind an even burn-down, not yet enough to colour), Codex with 40% left
+# and 2h20m to go. The weekly window has more left, so it is not shown.
+now=$(date +%s)
+D set -g @agent_limit_claude_at "$now"
+D set -g @agent_limit_claude_5h_used 38; D set -g @agent_limit_claude_5h_reset $((now + 12240))
+D set -g @agent_limit_claude_7d_used 30; D set -g @agent_limit_claude_7d_reset $((now + 345600))
+D set -g @agent_limit_codex_at "$now"
+D set -g @agent_limit_codex_5h_used 60;  D set -g @agent_limit_codex_5h_reset $((now + 8400))
+"$AS" limits
 
 D send-keys -t work:1 'clear; echo "api/payments  ·  claude --name api/payments"; echo; echo "> Adding idempotency keys to POST /charges ..."; echo; echo "  ✻ Working (12s · 3 tool uses)"' C-m
 D select-window -t work:1

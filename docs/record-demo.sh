@@ -31,6 +31,9 @@ AS="$ROOT/bin/agent-signal"
 
 pane() { D list-panes -t "work:$1" -F '#{pane_id}' | head -1; }
 set_state() { TMUX_PANE=$(pane "$1") AGENT_KIND=${3:-claude} "$AS" set "$2"; }
+# Claude's 5-hour window fills as its agents work: at 43% used the meter is
+# more than ten points behind pace and turns orange.
+usage() { D set -g @agent_limit_claude_5h_used "$1"; "$AS" limits; }
 # Replace a pane's shell with a fresh sh that prints the given lines first, so
 # the text appears without any typed command echoing on screen. The agent
 # state lives in pane options, which respawn keeps.
@@ -51,9 +54,9 @@ show 4 "infra/tf  ·  codex" "" "  ? Apply this plan to production, or staging f
   sleep 2.5; show 1 "api/payments" "" "  ✻ Working (14s · 4 tool uses)"
   sleep 1.5; set_state data done
   sleep 1.5; set_state api blocked;  show 1 "api/payments" "" "  Allow Bash(git push)?  (y/n)"
-  sleep 2.0; set_state api working;  show 1 "api/payments" "" "  ✻ Working (2s · 1 tool use)"
+  sleep 2.0; set_state api working;  show 1 "api/payments" "" "  ✻ Working (2s · 1 tool use)"; usage 40
   sleep 1.5; D select-window -t work:2               # prefix + N would land here: oldest blocked
-  sleep 2.0; set_state web working;  show 2 "web/checkout" "" "  ✻ Working (1s)"
+  sleep 2.0; set_state web working;  show 2 "web/checkout" "" "  ✻ Working (1s)"; usage 43
   sleep 1.5; D select-window -t work:4               # next: the question
   sleep 1.5; set_state infra working codex; show 4 "infra/tf" "" "  Applying to staging ..."
   sleep 1.5; D select-window -t work:3               # done clears itself when viewed
@@ -64,7 +67,9 @@ show 4 "infra/tf  ·  codex" "" "  ? Apply this plan to production, or staging f
 ) &
 TMUX='' asciinema rec --overwrite --window-size 150x7 -c "tmux -L demo attach -t work" "$OUT.cast"
 wait
-# Drop the "[detached]" tail so the GIF ends on the status bar.
-awk '/\[detached/ {exit} {print}' "$OUT.cast" > "$OUT.cast.tmp" && mv "$OUT.cast.tmp" "$OUT.cast"
+# Drop the tail so the GIF ends on the status bar: the "[detached]" line, and
+# the screen clear tmux sends just before it as it leaves the alternate screen
+# (the two arrive as separate events, and the clear alone left a blank last frame).
+awk '/\[detached/ || /\\u001b\[\?1049l/ {exit} {print}' "$OUT.cast" > "$OUT.cast.tmp" && mv "$OUT.cast.tmp" "$OUT.cast"
 agg --font-family "Menlo,Apple Symbols" --font-size 20 --theme asciinema --last-frame-duration 3 "$OUT.cast" "$OUT.gif"
 ls -la "$OUT.gif"
